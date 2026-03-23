@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SmFieldInfoDao.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">udbx4j</a> &gt; <a href="index.source.html" class="el_package">com.supermap.udbx.system</a> &gt; <span class="el_source">SmFieldInfoDao.java</span></div><h1>SmFieldInfoDao.java</h1><pre class="source lang-java linenums">package com.supermap.udbx.system;
+
+import com.supermap.udbx.core.FieldInfo;
+import com.supermap.udbx.core.FieldType;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * SmFieldInfo 系统表的数据访问对象。
+ *
+ * &lt;p&gt;对应白皮书 §2.2 表 10 SmFieldInfo 字段定义。
+ * 提供对字段元信息的查询操作。
+ */
+public class SmFieldInfoDao {
+
+    private final Connection conn;
+
+<span class="nc" id="L24">    public SmFieldInfoDao(Connection conn) {</span>
+<span class="nc" id="L25">        this.conn = conn;</span>
+<span class="nc" id="L26">    }</span>
+
+    /**
+     * 根据数据集 ID 查询所有字段元信息。
+     *
+     * @param datasetId 数据集 ID
+     * @return 字段元信息列表
+     * @throws SQLException 查询失败时抛出
+     */
+    public List&lt;FieldInfo&gt; findByDatasetId(int datasetId) throws SQLException {
+<span class="nc" id="L36">        String sql = &quot;SELECT SmDatasetID, SmFieldName, SmFieldType, SmFieldCaption, SmFieldbRequired &quot; +</span>
+                     &quot;FROM SmFieldInfo WHERE SmDatasetID = ? ORDER BY SmID&quot;;
+<span class="nc" id="L38">        List&lt;FieldInfo&gt; results = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L40">        try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="nc" id="L41">            stmt.setInt(1, datasetId);</span>
+<span class="nc" id="L42">            try (ResultSet rs = stmt.executeQuery()) {</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">                while (rs.next()) {</span>
+<span class="nc" id="L44">                    results.add(mapRow(rs));</span>
+                }
+            }
+        }
+<span class="nc" id="L48">        return results;</span>
+    }
+
+    /**
+     * 根据数据集 ID 和字段名查询字段元信息。
+     *
+     * @param datasetId 数据集 ID
+     * @param fieldName 字段名
+     * @return 字段元信息（如果存在）
+     * @throws SQLException 查询失败时抛出
+     */
+    public Optional&lt;FieldInfo&gt; findByDatasetIdAndFieldName(int datasetId, String fieldName) throws SQLException {
+<span class="nc" id="L60">        String sql = &quot;SELECT SmDatasetID, SmFieldName, SmFieldType, SmFieldCaption, SmFieldbRequired &quot; +</span>
+                     &quot;FROM SmFieldInfo WHERE SmDatasetID = ? AND SmFieldName = ?&quot;;
+
+<span class="nc" id="L63">        try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="nc" id="L64">            stmt.setInt(1, datasetId);</span>
+<span class="nc" id="L65">            stmt.setString(2, fieldName);</span>
+<span class="nc" id="L66">            try (ResultSet rs = stmt.executeQuery()) {</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">                if (rs.next()) {</span>
+<span class="nc" id="L68">                    return Optional.of(mapRow(rs));</span>
+                }
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            }</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        }</span>
+<span class="nc" id="L72">        return Optional.empty();</span>
+    }
+
+    private FieldInfo mapRow(ResultSet rs) throws SQLException {
+<span class="nc" id="L76">        int datasetId = rs.getInt(&quot;SmDatasetID&quot;);</span>
+<span class="nc" id="L77">        String fieldName = rs.getString(&quot;SmFieldName&quot;);</span>
+<span class="nc" id="L78">        int fieldTypeValue = rs.getInt(&quot;SmFieldType&quot;);</span>
+<span class="nc" id="L79">        String fieldAlias = rs.getString(&quot;SmFieldCaption&quot;);</span>
+<span class="nc" id="L80">        int requiredValue = rs.getInt(&quot;SmFieldbRequired&quot;);</span>
+
+<span class="nc" id="L82">        FieldType fieldType = FieldType.fromValue(fieldTypeValue);</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        boolean required = requiredValue != 0;</span>
+
+<span class="nc" id="L85">        return new FieldInfo(datasetId, fieldName, fieldType, fieldAlias, required);</span>
+    }
+
+    /**
+     * 向 SmFieldInfo 中插入单条字段记录。
+     *
+     * @param field 字段元信息（datasetId 必须已设置）
+     * @throws SQLException 操作失败时抛出
+     */
+    public void insert(FieldInfo field) throws SQLException {
+<span class="nc" id="L95">        String sql = &quot;INSERT INTO SmFieldInfo &quot; +</span>
+                &quot;(SmDatasetID, SmFieldName, SmFieldType, SmFieldCaption, SmFieldbRequired) &quot; +
+                &quot;VALUES (?, ?, ?, ?, ?)&quot;;
+<span class="nc" id="L98">        try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="nc" id="L99">            stmt.setInt(1, field.datasetId());</span>
+<span class="nc" id="L100">            stmt.setString(2, field.fieldName());</span>
+<span class="nc" id="L101">            stmt.setInt(3, field.fieldType().getValue());</span>
+<span class="nc" id="L102">            stmt.setString(4, field.fieldAlias());</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            stmt.setInt(5, field.required() ? 1 : 0);</span>
+<span class="nc" id="L104">            stmt.executeUpdate();</span>
+        }
+<span class="nc" id="L106">    }</span>
+
+    /**
+     * 批量插入字段记录，字段的 datasetId 统一覆盖为 {@code datasetId} 参数。
+     *
+     * @param datasetId 目标数据集 ID
+     * @param fields    字段列表
+     * @throws SQLException 操作失败时抛出
+     */
+    public void insertAll(int datasetId, List&lt;FieldInfo&gt; fields) throws SQLException {
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        for (FieldInfo f : fields) {</span>
+<span class="nc" id="L117">            insert(new FieldInfo(datasetId, f.fieldName(), f.fieldType(), f.fieldAlias(), f.required()));</span>
+<span class="nc" id="L118">        }</span>
+<span class="nc" id="L119">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

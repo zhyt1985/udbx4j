@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LineZDataset.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">udbx4j</a> &gt; <a href="index.source.html" class="el_package">com.supermap.udbx.dataset</a> &gt; <span class="el_source">LineZDataset.java</span></div><h1>LineZDataset.java</h1><pre class="source lang-java linenums">package com.supermap.udbx.dataset;
+
+import com.supermap.udbx.core.DatasetInfo;
+import com.supermap.udbx.geometry.gaia.GaiaGeometryReader;
+import com.supermap.udbx.geometry.gaia.GaiaGeometryWriter;
+import com.supermap.udbx.system.SmRegisterDao;
+import org.locationtech.jts.geom.MultiLineString;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 三维线数据集实现（DatasetType=LineZ=103，geoType=1005 GAIAMultiLineStringZ）。
+ *
+ * &lt;p&gt;对应白皮书 §3.1.3（三维线数据集）和 §4.2.4（GAIAMultiLineStringZ 格式）。
+ */
+public class LineZDataset extends VectorDataset {
+
+    private static final String GEOMETRY_COLUMN = &quot;SmGeometry&quot;;
+    private static final String SYSTEM_COLUMN_PREFIX = &quot;Sm&quot;;
+
+    public LineZDataset(Connection conn, DatasetInfo info) {
+<span class="nc" id="L30">        super(conn, info);</span>
+<span class="nc" id="L31">    }</span>
+
+    /**
+     * 读取该数据集中的所有三维线要素。
+     */
+    public List&lt;LineFeature&gt; getFeatures() {
+<span class="nc" id="L37">        String sql = &quot;SELECT * FROM \&quot;&quot; + getTableName() + &quot;\&quot; ORDER BY SmID&quot;;</span>
+<span class="nc" id="L38">        List&lt;LineFeature&gt; features = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L40">        try (PreparedStatement stmt = conn.prepareStatement(sql);</span>
+<span class="nc" id="L41">             ResultSet rs = stmt.executeQuery()) {</span>
+<span class="nc" id="L42">            List&lt;String&gt; userColumns = resolveUserColumns(rs.getMetaData());</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">            while (rs.next()) {</span>
+<span class="nc" id="L44">                features.add(mapRow(rs, userColumns));</span>
+            }
+<span class="nc" id="L46">        } catch (SQLException e) {</span>
+<span class="nc" id="L47">            throw new RuntimeException(&quot;读取三维线数据集 [&quot; + getName() + &quot;] 失败&quot;, e);</span>
+<span class="nc" id="L48">        }</span>
+<span class="nc" id="L49">        return features;</span>
+    }
+
+    /**
+     * 根据 SmID 读取单个三维线要素。
+     */
+    public LineFeature getFeature(int smId) {
+<span class="nc" id="L56">        String sql = &quot;SELECT * FROM \&quot;&quot; + getTableName() + &quot;\&quot; WHERE SmID = ?&quot;;</span>
+
+<span class="nc" id="L58">        try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="nc" id="L59">            stmt.setInt(1, smId);</span>
+<span class="nc" id="L60">            try (ResultSet rs = stmt.executeQuery()) {</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">                if (!rs.next()) {</span>
+<span class="nc" id="L62">                    return null;</span>
+                }
+<span class="nc" id="L64">                List&lt;String&gt; userColumns = resolveUserColumns(rs.getMetaData());</span>
+<span class="nc" id="L65">                return mapRow(rs, userColumns);</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">            }</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        } catch (SQLException e) {</span>
+<span class="nc" id="L68">            throw new RuntimeException(&quot;读取三维线要素 SmID=&quot; + smId + &quot; 失败&quot;, e);</span>
+        }
+    }
+
+    /**
+     * 向数据集中写入一个三维线要素。
+     */
+    public void addFeature(int smId, MultiLineString geometry, Map&lt;String, Object&gt; attributes) {
+<span class="nc" id="L76">        byte[] geomBytes = GaiaGeometryWriter.writeMultiLineStringZ(geometry, info.srid());</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        List&lt;String&gt; attrKeys = attributes == null ? java.util.List.of() : new ArrayList&lt;&gt;(attributes.keySet());</span>
+
+<span class="nc" id="L79">        StringBuilder sqlBuf = new StringBuilder(&quot;INSERT INTO \&quot;&quot;).append(getTableName())</span>
+<span class="nc" id="L80">                .append(&quot;\&quot; (SmID, SmUserID, \&quot;SmGeometry\&quot;&quot;);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        for (String key : attrKeys) {</span>
+<span class="nc" id="L82">            sqlBuf.append(&quot;, \&quot;&quot;).append(key).append(&quot;\&quot;&quot;);</span>
+<span class="nc" id="L83">        }</span>
+<span class="nc" id="L84">        sqlBuf.append(&quot;) VALUES (?, 0, ?&quot;);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        for (int i = 0; i &lt; attrKeys.size(); i++) {</span>
+<span class="nc" id="L86">            sqlBuf.append(&quot;, ?&quot;);</span>
+        }
+<span class="nc" id="L88">        sqlBuf.append(&quot;)&quot;);</span>
+
+        try {
+<span class="nc" id="L91">            conn.setAutoCommit(false);</span>
+<span class="nc" id="L92">            try (PreparedStatement stmt = conn.prepareStatement(sqlBuf.toString())) {</span>
+<span class="nc" id="L93">                stmt.setInt(1, smId);</span>
+<span class="nc" id="L94">                stmt.setBytes(2, geomBytes);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                for (int i = 0; i &lt; attrKeys.size(); i++) {</span>
+<span class="nc" id="L96">                    stmt.setObject(3 + i, attributes.get(attrKeys.get(i)));</span>
+                }
+<span class="nc" id="L98">                stmt.executeUpdate();</span>
+            }
+<span class="nc" id="L100">            new SmRegisterDao(conn).incrementObjectCount(info.datasetId(), geomBytes.length);</span>
+<span class="nc" id="L101">            conn.commit();</span>
+<span class="nc" id="L102">        } catch (SQLException e) {</span>
+<span class="nc" id="L103">            try { conn.rollback(); } catch (SQLException ignored) {}</span>
+<span class="nc" id="L104">            throw new RuntimeException(&quot;写入三维线要素 SmID=&quot; + smId + &quot; 失败&quot;, e);</span>
+        } finally {
+<span class="nc" id="L106">            try { conn.setAutoCommit(true); } catch (SQLException ignored) {}</span>
+        }
+<span class="nc" id="L108">    }</span>
+
+    public void deleteFeature(int smId) {
+<span class="nc" id="L111">        String sql = &quot;DELETE FROM \&quot;&quot; + getTableName() + &quot;\&quot; WHERE SmID = ?&quot;;</span>
+        try {
+<span class="nc" id="L113">            conn.setAutoCommit(false);</span>
+<span class="nc" id="L114">            try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="nc" id="L115">                stmt.setInt(1, smId);</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                if (stmt.executeUpdate() == 0) throw new SQLException(&quot;SmID=&quot; + smId + &quot; 不存在&quot;);</span>
+            }
+<span class="nc" id="L118">            new SmRegisterDao(conn).decrementObjectCount(info.datasetId());</span>
+<span class="nc" id="L119">            conn.commit();</span>
+<span class="nc" id="L120">        } catch (SQLException e) {</span>
+<span class="nc" id="L121">            try { conn.rollback(); } catch (SQLException ignored) {}</span>
+<span class="nc" id="L122">            throw new RuntimeException(&quot;删除三维线要素 SmID=&quot; + smId + &quot; 失败: &quot; + e.getMessage(), e);</span>
+        } finally {
+<span class="nc" id="L124">            try { conn.setAutoCommit(true); } catch (SQLException ignored) {}</span>
+        }
+<span class="nc" id="L126">    }</span>
+
+    public void updateFeature(int smId, org.locationtech.jts.geom.MultiLineString geometry, Map&lt;String, Object&gt; attributes) {
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        List&lt;String&gt; attrKeys = attributes == null ? List.of() : new ArrayList&lt;&gt;(attributes.keySet());</span>
+<span class="nc" id="L130">        StringBuilder sqlBuf = new StringBuilder(&quot;UPDATE \&quot;&quot;).append(getTableName()).append(&quot;\&quot; SET &quot;);</span>
+<span class="nc" id="L131">        boolean hasSet = false;</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (geometry != null) {</span>
+<span class="nc" id="L133">            sqlBuf.append(&quot;\&quot;SmGeometry\&quot; = ?&quot;);</span>
+<span class="nc" id="L134">            hasSet = true;</span>
+        }
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        for (String key : attrKeys) {</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            if (hasSet) sqlBuf.append(&quot;, &quot;);</span>
+<span class="nc" id="L138">            sqlBuf.append(&quot;\&quot;&quot;).append(key).append(&quot;\&quot; = ?&quot;);</span>
+<span class="nc" id="L139">            hasSet = true;</span>
+<span class="nc" id="L140">        }</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (!hasSet) return;</span>
+<span class="nc" id="L142">        sqlBuf.append(&quot; WHERE SmID = ?&quot;);</span>
+
+        try {
+<span class="nc" id="L145">            conn.setAutoCommit(false);</span>
+<span class="nc" id="L146">            try (PreparedStatement stmt = conn.prepareStatement(sqlBuf.toString())) {</span>
+<span class="nc" id="L147">                int idx = 1;</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                if (geometry != null) stmt.setBytes(idx++, GaiaGeometryWriter.writeMultiLineStringZ(geometry, info.srid()));</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                for (String key : attrKeys) stmt.setObject(idx++, attributes.get(key));</span>
+<span class="nc" id="L150">                stmt.setInt(idx, smId);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                if (stmt.executeUpdate() == 0) throw new SQLException(&quot;SmID=&quot; + smId + &quot; 不存在&quot;);</span>
+            }
+<span class="nc" id="L153">            conn.commit();</span>
+<span class="nc" id="L154">        } catch (SQLException e) {</span>
+<span class="nc" id="L155">            try { conn.rollback(); } catch (SQLException ignored) {}</span>
+<span class="nc" id="L156">            throw new RuntimeException(&quot;更新三维线要素 SmID=&quot; + smId + &quot; 失败: &quot; + e.getMessage(), e);</span>
+        } finally {
+<span class="nc" id="L158">            try { conn.setAutoCommit(true); } catch (SQLException ignored) {}</span>
+        }
+<span class="nc" id="L160">    }</span>
+
+    private List&lt;String&gt; resolveUserColumns(ResultSetMetaData meta) throws SQLException {
+<span class="nc" id="L163">        List&lt;String&gt; columns = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L164">        int count = meta.getColumnCount();</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        for (int i = 1; i &lt;= count; i++) {</span>
+<span class="nc" id="L166">            String name = meta.getColumnName(i);</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">            if (!name.startsWith(SYSTEM_COLUMN_PREFIX)) {</span>
+<span class="nc" id="L168">                columns.add(name);</span>
+            }
+        }
+<span class="nc" id="L171">        return columns;</span>
+    }
+
+    private LineFeature mapRow(ResultSet rs, List&lt;String&gt; userColumns) throws SQLException {
+<span class="nc" id="L175">        int smId = rs.getInt(&quot;SmID&quot;);</span>
+<span class="nc" id="L176">        byte[] geomBytes = rs.getBytes(GEOMETRY_COLUMN);</span>
+<span class="nc" id="L177">        MultiLineString geometry = GaiaGeometryReader.readMultiLineStringZ(geomBytes);</span>
+
+<span class="nc" id="L179">        Map&lt;String, Object&gt; attributes = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        for (String col : userColumns) {</span>
+<span class="nc" id="L181">            attributes.put(col, rs.getObject(col));</span>
+<span class="nc" id="L182">        }</span>
+
+<span class="nc" id="L184">        return new LineFeature(smId, geometry, attributes);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

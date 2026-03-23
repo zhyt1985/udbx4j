@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LineFeature.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">udbx4j</a> &gt; <a href="index.source.html" class="el_package">com.supermap.udbx.dataset</a> &gt; <span class="el_source">LineFeature.java</span></div><h1>LineFeature.java</h1><pre class="source lang-java linenums">package com.supermap.udbx.dataset;
+
+import org.locationtech.jts.geom.MultiLineString;
+
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * 线数据集要素（不可变 Record）。
+ *
+ * &lt;p&gt;包含 SmID、MultiLineString 几何体和用户属性字段。
+ * 对应白皮书 §3.1.3（线数据集记录结构）。
+ *
+ * @param smId       SmID —— 要素唯一 ID（系统字段）
+ * @param geometry   JTS MultiLineString 几何对象（SRID 已由 GaiaGeometryReader 设置）
+ * @param attributes 用户属性字段（字段名 → 字段值），不可变视图
+ */
+public record LineFeature(
+        int smId,
+        MultiLineString geometry,
+        Map&lt;String, Object&gt; attributes
+) {
+<span class="fc" id="L23">    public LineFeature {</span>
+<span class="fc" id="L24">        Objects.requireNonNull(geometry, &quot;geometry must not be null&quot;);</span>
+<span class="fc" id="L25">        Objects.requireNonNull(attributes, &quot;attributes must not be null&quot;);</span>
+        // 防御性拷贝：过滤 null 值
+<span class="fc" id="L27">        attributes = attributes.entrySet().stream()</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">                .filter(e -&gt; e.getValue() != null)</span>
+<span class="fc" id="L29">                .collect(java.util.stream.Collectors.toUnmodifiableMap(</span>
+                        Map.Entry::getKey, Map.Entry::getValue));
+<span class="fc" id="L31">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

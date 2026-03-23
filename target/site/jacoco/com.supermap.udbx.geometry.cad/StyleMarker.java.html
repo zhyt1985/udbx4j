@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StyleMarker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">udbx4j</a> &gt; <a href="index.source.html" class="el_package">com.supermap.udbx.geometry.cad</a> &gt; <span class="el_source">StyleMarker.java</span></div><h1>StyleMarker.java</h1><pre class="source lang-java linenums">package com.supermap.udbx.geometry.cad;
+
+/**
+ * 点符号风格（StyleMarker）。
+ *
+ * &lt;p&gt;对应白皮书 §4.3.1.1。Color 字段以 int32 存储，ABGR 字节顺序。
+ *
+ * @param markerStyle     点符号在符号库中的 ID
+ * @param markerSize      符号大小，精度 0.1mm
+ * @param markerAngle     符号旋转角度，单位 0.1 度
+ * @param markerColor     符号颜色（ABGR int32）
+ * @param markerWidth     符号宽度
+ * @param markerHeight    符号高度
+ * @param fillOpaqueRate  填充透明度
+ * @param fillGradientType 渐变填充类型
+ * @param fillAngle       填充角度
+ * @param fillCenterOffsetX 填充中心点水平偏移百分比
+ * @param fillCenterOffsetY 填充中心点垂直偏移百分比
+ * @param fillBackcolor   填充背景色（ABGR int32）
+ */
+<span class="fc" id="L21">public record StyleMarker(</span>
+        int markerStyle,
+        int markerSize,
+        int markerAngle,
+        int markerColor,
+        int markerWidth,
+        int markerHeight,
+        byte fillOpaqueRate,
+        byte fillGradientType,
+        short fillAngle,
+        short fillCenterOffsetX,
+        short fillCenterOffsetY,
+        int fillBackcolor
+) implements CadStyle {
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

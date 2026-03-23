@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TabularDataset.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">udbx4j</a> &gt; <a href="index.source.html" class="el_package">com.supermap.udbx.dataset</a> &gt; <span class="el_source">TabularDataset.java</span></div><h1>TabularDataset.java</h1><pre class="source lang-java linenums">package com.supermap.udbx.dataset;
+
+import com.supermap.udbx.core.DatasetInfo;
+import com.supermap.udbx.system.SmRegisterDao;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 纯属性表数据集实现（DatasetType=Tabular，无几何）。
+ *
+ * &lt;p&gt;从数据表（如 TabularDT）读取属性记录，无 SmGeometry 列。
+ *
+ * &lt;p&gt;对应白皮书 §3.1.1（Tabular 数据集）。
+ *
+ * &lt;p&gt;系统字段（SmID、SmUserID 等以 &quot;Sm&quot; 开头的列）不出现在
+ * {@link TabularRecord#attributes()} 中。
+ */
+public class TabularDataset extends Dataset {
+
+    /** 系统字段前缀：以此开头的列不计入用户属性。 */
+    private static final String SYSTEM_COLUMN_PREFIX = &quot;Sm&quot;;
+
+    public TabularDataset(Connection conn, DatasetInfo info) {
+<span class="fc" id="L32">        super(conn, info);</span>
+<span class="fc" id="L33">    }</span>
+
+    /**
+     * 读取该数据集中的所有记录。
+     *
+     * @return 记录列表（按 SmID 升序）
+     * @throws RuntimeException 若数据库查询失败
+     */
+    public List&lt;TabularRecord&gt; getRecords() {
+<span class="fc" id="L42">        String tableName = info.datasetName();</span>
+<span class="fc" id="L43">        String sql = &quot;SELECT * FROM \&quot;&quot; + tableName + &quot;\&quot; ORDER BY SmID&quot;;</span>
+<span class="fc" id="L44">        List&lt;TabularRecord&gt; records = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L46">        try (PreparedStatement stmt = conn.prepareStatement(sql);</span>
+<span class="fc" id="L47">             ResultSet rs = stmt.executeQuery()) {</span>
+<span class="fc" id="L48">            List&lt;String&gt; userColumns = resolveUserColumns(rs.getMetaData());</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            while (rs.next()) {</span>
+<span class="fc" id="L50">                records.add(mapRow(rs, userColumns));</span>
+            }
+<span class="nc" id="L52">        } catch (SQLException e) {</span>
+<span class="nc" id="L53">            throw new RuntimeException(&quot;读取属性表数据集 [&quot; + tableName + &quot;] 失败&quot;, e);</span>
+<span class="fc" id="L54">        }</span>
+<span class="fc" id="L55">        return records;</span>
+    }
+
+    /**
+     * 根据 SmID 读取单条记录。
+     *
+     * @param smId 记录 SmID
+     * @return 记录对象，不存在时返回 {@code null}
+     * @throws RuntimeException 若数据库查询失败
+     */
+    public TabularRecord getRecord(int smId) {
+<span class="nc" id="L66">        String tableName = info.datasetName();</span>
+<span class="nc" id="L67">        String sql = &quot;SELECT * FROM \&quot;&quot; + tableName + &quot;\&quot; WHERE SmID = ?&quot;;</span>
+
+<span class="nc" id="L69">        try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="nc" id="L70">            stmt.setInt(1, smId);</span>
+<span class="nc" id="L71">            try (ResultSet rs = stmt.executeQuery()) {</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">                if (!rs.next()) {</span>
+<span class="nc" id="L73">                    return null;</span>
+                }
+<span class="nc" id="L75">                List&lt;String&gt; userColumns = resolveUserColumns(rs.getMetaData());</span>
+<span class="nc" id="L76">                return mapRow(rs, userColumns);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            }</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        } catch (SQLException e) {</span>
+<span class="nc" id="L79">            throw new RuntimeException(&quot;读取属性记录 SmID=&quot; + smId + &quot; 失败&quot;, e);</span>
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 写入方法
+    // -----------------------------------------------------------------------
+
+    /**
+     * 向属性表中写入一条记录。
+     *
+     * @param smId       记录 SmID
+     * @param attributes 用户属性字段（暂不写入，预留接口）
+     * @throws RuntimeException 若写入失败
+     */
+    public void addRow(int smId, Map&lt;String, Object&gt; attributes) {
+<span class="nc" id="L95">        String tableName = info.datasetName();</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        List&lt;String&gt; attrKeys = attributes == null ? java.util.List.of() : new ArrayList&lt;&gt;(attributes.keySet());</span>
+
+<span class="nc" id="L98">        StringBuilder sqlBuf = new StringBuilder(&quot;INSERT INTO \&quot;&quot;).append(tableName)</span>
+<span class="nc" id="L99">                .append(&quot;\&quot; (SmID, SmUserID&quot;);</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        for (String key : attrKeys) {</span>
+<span class="nc" id="L101">            sqlBuf.append(&quot;, \&quot;&quot;).append(key).append(&quot;\&quot;&quot;);</span>
+<span class="nc" id="L102">        }</span>
+<span class="nc" id="L103">        sqlBuf.append(&quot;) VALUES (?, 0&quot;);</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        for (int i = 0; i &lt; attrKeys.size(); i++) {</span>
+<span class="nc" id="L105">            sqlBuf.append(&quot;, ?&quot;);</span>
+        }
+<span class="nc" id="L107">        sqlBuf.append(&quot;)&quot;);</span>
+
+        try {
+<span class="nc" id="L110">            conn.setAutoCommit(false);</span>
+<span class="nc" id="L111">            try (PreparedStatement stmt = conn.prepareStatement(sqlBuf.toString())) {</span>
+<span class="nc" id="L112">                stmt.setInt(1, smId);</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                for (int i = 0; i &lt; attrKeys.size(); i++) {</span>
+<span class="nc" id="L114">                    stmt.setObject(2 + i, attributes.get(attrKeys.get(i)));</span>
+                }
+<span class="nc" id="L116">                stmt.executeUpdate();</span>
+            }
+<span class="nc" id="L118">            new SmRegisterDao(conn).incrementObjectCount(info.datasetId());</span>
+<span class="nc" id="L119">            conn.commit();</span>
+<span class="nc" id="L120">        } catch (SQLException e) {</span>
+<span class="nc" id="L121">            try { conn.rollback(); } catch (SQLException ignored) {}</span>
+<span class="nc" id="L122">            throw new RuntimeException(&quot;写入属性记录 SmID=&quot; + smId + &quot; 失败&quot;, e);</span>
+        } finally {
+<span class="nc" id="L124">            try { conn.setAutoCommit(true); } catch (SQLException ignored) {}</span>
+        }
+<span class="nc" id="L126">    }</span>
+
+    public void deleteRow(int smId) {
+<span class="nc" id="L129">        String tableName = info.datasetName();</span>
+<span class="nc" id="L130">        String sql = &quot;DELETE FROM \&quot;&quot; + tableName + &quot;\&quot; WHERE SmID = ?&quot;;</span>
+        try {
+<span class="nc" id="L132">            conn.setAutoCommit(false);</span>
+<span class="nc" id="L133">            try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="nc" id="L134">                stmt.setInt(1, smId);</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                if (stmt.executeUpdate() == 0) throw new SQLException(&quot;SmID=&quot; + smId + &quot; 不存在&quot;);</span>
+            }
+<span class="nc" id="L137">            new SmRegisterDao(conn).decrementObjectCount(info.datasetId());</span>
+<span class="nc" id="L138">            conn.commit();</span>
+<span class="nc" id="L139">        } catch (SQLException e) {</span>
+<span class="nc" id="L140">            try { conn.rollback(); } catch (SQLException ignored) {}</span>
+<span class="nc" id="L141">            throw new RuntimeException(&quot;删除属性记录 SmID=&quot; + smId + &quot; 失败: &quot; + e.getMessage(), e);</span>
+        } finally {
+<span class="nc" id="L143">            try { conn.setAutoCommit(true); } catch (SQLException ignored) {}</span>
+        }
+<span class="nc" id="L145">    }</span>
+
+    public void updateRow(int smId, Map&lt;String, Object&gt; attributes) {
+<span class="nc" id="L148">        String tableName = info.datasetName();</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        List&lt;String&gt; attrKeys = attributes == null ? List.of() : new ArrayList&lt;&gt;(attributes.keySet());</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (attrKeys.isEmpty()) return;</span>
+
+<span class="nc" id="L152">        StringBuilder sqlBuf = new StringBuilder(&quot;UPDATE \&quot;&quot;).append(tableName).append(&quot;\&quot; SET &quot;);</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        for (int i = 0; i &lt; attrKeys.size(); i++) {</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            if (i &gt; 0) sqlBuf.append(&quot;, &quot;);</span>
+<span class="nc" id="L155">            sqlBuf.append(&quot;\&quot;&quot;).append(attrKeys.get(i)).append(&quot;\&quot; = ?&quot;);</span>
+        }
+<span class="nc" id="L157">        sqlBuf.append(&quot; WHERE SmID = ?&quot;);</span>
+
+        try {
+<span class="nc" id="L160">            conn.setAutoCommit(false);</span>
+<span class="nc" id="L161">            try (PreparedStatement stmt = conn.prepareStatement(sqlBuf.toString())) {</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                for (int i = 0; i &lt; attrKeys.size(); i++) {</span>
+<span class="nc" id="L163">                    stmt.setObject(i + 1, attributes.get(attrKeys.get(i)));</span>
+                }
+<span class="nc" id="L165">                stmt.setInt(attrKeys.size() + 1, smId);</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">                if (stmt.executeUpdate() == 0) throw new SQLException(&quot;SmID=&quot; + smId + &quot; 不存在&quot;);</span>
+            }
+<span class="nc" id="L168">            conn.commit();</span>
+<span class="nc" id="L169">        } catch (SQLException e) {</span>
+<span class="nc" id="L170">            try { conn.rollback(); } catch (SQLException ignored) {}</span>
+<span class="nc" id="L171">            throw new RuntimeException(&quot;更新属性记录 SmID=&quot; + smId + &quot; 失败: &quot; + e.getMessage(), e);</span>
+        } finally {
+<span class="nc" id="L173">            try { conn.setAutoCommit(true); } catch (SQLException ignored) {}</span>
+        }
+<span class="nc" id="L175">    }</span>
+
+    // -----------------------------------------------------------------------
+    // 私有辅助方法
+    // -----------------------------------------------------------------------
+
+    /**
+     * 从 ResultSetMetaData 中提取用户字段列名（排除以 &quot;Sm&quot; 开头的系统字段）。
+     */
+    private List&lt;String&gt; resolveUserColumns(ResultSetMetaData meta) throws SQLException {
+<span class="fc" id="L185">        List&lt;String&gt; columns = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L186">        int count = meta.getColumnCount();</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        for (int i = 1; i &lt;= count; i++) {</span>
+<span class="fc" id="L188">            String name = meta.getColumnName(i);</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            if (!name.startsWith(SYSTEM_COLUMN_PREFIX)) {</span>
+<span class="fc" id="L190">                columns.add(name);</span>
+            }
+        }
+<span class="fc" id="L193">        return columns;</span>
+    }
+
+    /**
+     * 将当前行映射为 TabularRecord。
+     *
+     * @param rs          ResultSet（已定位到目标行）
+     * @param userColumns 用户字段列名列表
+     */
+    private TabularRecord mapRow(ResultSet rs, List&lt;String&gt; userColumns) throws SQLException {
+<span class="fc" id="L203">        int smId = rs.getInt(&quot;SmID&quot;);</span>
+
+<span class="fc" id="L205">        Map&lt;String, Object&gt; attributes = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        for (String col : userColumns) {</span>
+<span class="fc" id="L207">            attributes.put(col, rs.getObject(col));</span>
+<span class="fc" id="L208">        }</span>
+
+<span class="fc" id="L210">        return new TabularRecord(smId, attributes);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

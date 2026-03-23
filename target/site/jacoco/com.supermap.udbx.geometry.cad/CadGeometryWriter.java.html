@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CadGeometryWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">udbx4j</a> &gt; <a href="index.source.html" class="el_package">com.supermap.udbx.geometry.cad</a> &gt; <span class="el_source">CadGeometryWriter.java</span></div><h1>CadGeometryWriter.java</h1><pre class="source lang-java linenums">package com.supermap.udbx.geometry.cad;
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
+/**
+ * CAD Geometry 编码器。
+ *
+ * &lt;p&gt;将 {@link CadGeometry} 对象序列化为 GeoHeader 格式字节数组（Little-Endian）。
+ *
+ * &lt;p&gt;GeoHeader 格式：
+ * &lt;pre&gt;
+ *   int32  geoType    // 对象类型，见表 25
+ *   int32  styleSize  // 风格字节数（0 表示无风格）
+ *   byte[] style      // styleSize 字节的风格数据
+ *   ...几何数据...
+ * &lt;/pre&gt;
+ *
+ * &lt;p&gt;风格序列化：reservedLength 始终写为 0，reservedData 写 4 字节零值。
+ * StyleMarker 额外包含 int32 length 前缀。
+ */
+public final class CadGeometryWriter {
+
+    private CadGeometryWriter() {}
+
+    /**
+     * 将 CAD 几何对象序列化为字节数组。
+     *
+     * @param geom 要编码的几何对象
+     * @return GeoHeader 格式字节数组（Little-Endian）
+     */
+    public static byte[] write(CadGeometry geom) {
+<span class="fc" id="L33">        byte[] styleBytes = encodeStyle(geom.style());</span>
+<span class="fc" id="L34">        byte[] geoBytes   = encodeGeometry(geom);</span>
+
+<span class="fc" id="L36">        int totalSize = 4 + 4 + styleBytes.length + geoBytes.length;</span>
+<span class="fc" id="L37">        ByteBuffer buf = ByteBuffer.allocate(totalSize).order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L38">        buf.putInt(cadTypeValue(geom));</span>
+<span class="fc" id="L39">        buf.putInt(styleBytes.length);</span>
+<span class="fc" id="L40">        buf.put(styleBytes);</span>
+<span class="fc" id="L41">        buf.put(geoBytes);</span>
+<span class="fc" id="L42">        return buf.array();</span>
+    }
+
+    // ── geoType 整数值映射 ────────────────────────────────────────────────────
+
+    private static int cadTypeValue(CadGeometry geom) {
+        // GeoCurveObject 使用 geoType() 枚举直接获取数值
+<span class="fc" id="L49">        return geom.geoType().getValue();</span>
+    }
+
+    // ── Style 编码 ────────────────────────────────────────────────────────────
+
+    private static byte[] encodeStyle(CadStyle style) {
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (style == null) {</span>
+<span class="fc" id="L56">            return new byte[0];</span>
+        }
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (style instanceof StyleMarker m) {</span>
+<span class="fc" id="L59">            return encodeStyleMarker(m);</span>
+        }
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (style instanceof StyleLine l) {</span>
+<span class="fc" id="L62">            return encodeStyleLine(l);</span>
+        }
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (style instanceof StyleFill f) {</span>
+<span class="fc" id="L65">            return encodeStyleFill(f);</span>
+        }
+<span class="nc" id="L67">        throw new IllegalArgumentException(&quot;Unknown CadStyle type: &quot; + style.getClass());</span>
+    }
+
+    /**
+     * StyleMarker 编码（白皮书 §4.3.1.1）：
+     * &lt;pre&gt;
+     *   length(4) + markerStyle(4) + markerSize(4) + markerAngle(4) + markerColor(4)
+     *   + markerWidth(4) + markerHeight(4) + reservedLength(1) + reservedData[0+4]
+     *   + fillOpaqueRate(1) + fillGradientType(1) + fillAngle(2)
+     *   + fillCenterOffsetX(2) + fillCenterOffsetY(2) + fillBackcolor(4)
+     * &lt;/pre&gt;
+     * reservedLength=0 → reservedData=4 字节零值。
+     * 总计：4+4+4+4+4+4+4+1+4+1+1+2+2+2+4 = 45 字节（含 length 字段）。
+     */
+    private static byte[] encodeStyleMarker(StyleMarker m) {
+        // body after length field = 41 bytes
+<span class="fc" id="L83">        int bodySize = 4 + 4 + 4 + 4 + 4 + 4 + 1 + 4 + 1 + 1 + 2 + 2 + 2 + 4; // 41</span>
+<span class="fc" id="L84">        ByteBuffer buf = ByteBuffer.allocate(4 + bodySize).order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L85">        buf.putInt(bodySize);               // length (= body byte count)</span>
+<span class="fc" id="L86">        buf.putInt(m.markerStyle());</span>
+<span class="fc" id="L87">        buf.putInt(m.markerSize());</span>
+<span class="fc" id="L88">        buf.putInt(m.markerAngle());</span>
+<span class="fc" id="L89">        buf.putInt(m.markerColor());</span>
+<span class="fc" id="L90">        buf.putInt(m.markerWidth());</span>
+<span class="fc" id="L91">        buf.putInt(m.markerHeight());</span>
+<span class="fc" id="L92">        buf.put((byte) 0);                  // reservedLength = 0</span>
+<span class="fc" id="L93">        buf.putInt(0);                      // reservedData[4]</span>
+<span class="fc" id="L94">        buf.put(m.fillOpaqueRate());</span>
+<span class="fc" id="L95">        buf.put(m.fillGradientType());</span>
+<span class="fc" id="L96">        buf.putShort(m.fillAngle());</span>
+<span class="fc" id="L97">        buf.putShort(m.fillCenterOffsetX());</span>
+<span class="fc" id="L98">        buf.putShort(m.fillCenterOffsetY());</span>
+<span class="fc" id="L99">        buf.putInt(m.fillBackcolor());</span>
+<span class="fc" id="L100">        return buf.array();</span>
+    }
+
+    /**
+     * StyleLine 编码（白皮书 §4.3.1.2）：
+     * &lt;pre&gt;
+     *   lineStyle(4) + lineWidth(4) + lineColor(4)
+     *   + reservedLength(1) + reservedData[0+4]
+     * &lt;/pre&gt;
+     * 总计：4+4+4+1+4 = 17 字节。
+     */
+    private static byte[] encodeStyleLine(StyleLine l) {
+<span class="fc" id="L112">        ByteBuffer buf = ByteBuffer.allocate(17).order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L113">        buf.putInt(l.lineStyle());</span>
+<span class="fc" id="L114">        buf.putInt(l.lineWidth());</span>
+<span class="fc" id="L115">        buf.putInt(l.lineColor());</span>
+<span class="fc" id="L116">        buf.put((byte) 0);  // reservedLength = 0</span>
+<span class="fc" id="L117">        buf.putInt(0);      // reservedData[4]</span>
+<span class="fc" id="L118">        return buf.array();</span>
+    }
+
+    /**
+     * StyleFill 编码（白皮书 §4.3.1.3）：
+     * &lt;pre&gt;
+     *   lineStyle(4)+lineWidth(4)+lineColor(4)+fillStyle(4)+fillForecolor(4)+fillBackcolor(4)
+     *   +fillOpaquerate(1)+fillGadientType(1)+fillAngle(2)+fillCenterOffsetX(2)+fillCenterOffsetY(2)
+     *   +reserved1Length(1)+reserved1Data[0+4]
+     *   +reserved2Length(1)+reserved2Data[0+4]
+     * &lt;/pre&gt;
+     * 总计：4+4+4+4+4+4+1+1+2+2+2+1+4+1+4 = 42 字节。
+     */
+    private static byte[] encodeStyleFill(StyleFill f) {
+<span class="fc" id="L132">        ByteBuffer buf = ByteBuffer.allocate(42).order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L133">        buf.putInt(f.lineStyle());</span>
+<span class="fc" id="L134">        buf.putInt(f.lineWidth());</span>
+<span class="fc" id="L135">        buf.putInt(f.lineColor());</span>
+<span class="fc" id="L136">        buf.putInt(f.fillStyle());</span>
+<span class="fc" id="L137">        buf.putInt(f.fillForecolor());</span>
+<span class="fc" id="L138">        buf.putInt(f.fillBackcolor());</span>
+<span class="fc" id="L139">        buf.put(f.fillOpaquerate());</span>
+<span class="fc" id="L140">        buf.put(f.fillGadientType());</span>
+<span class="fc" id="L141">        buf.putShort(f.fillAngle());</span>
+<span class="fc" id="L142">        buf.putShort(f.fillCenterOffsetX());</span>
+<span class="fc" id="L143">        buf.putShort(f.fillCenterOffsetY());</span>
+<span class="fc" id="L144">        buf.put((byte) 0); buf.putInt(0);  // reserved1Length=0 + reserved1Data[4]</span>
+<span class="fc" id="L145">        buf.put((byte) 0); buf.putInt(0);  // reserved2Length=0 + reserved2Data[4]</span>
+<span class="fc" id="L146">        return buf.array();</span>
+    }
+
+    // ── 几何数据编码 ──────────────────────────────────────────────────────────
+
+    private static byte[] encodeGeometry(CadGeometry geom) {
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (geom instanceof CadGeometry.GeoPoint g)       return encodeGeoPoint(g);</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (geom instanceof CadGeometry.GeoPoint3D g)     return encodeGeoPoint3D(g);</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (geom instanceof CadGeometry.GeoLine g)        return encodeLineOrRegion2D(g.numSub(), g.subPointCounts(), g.xs(), g.ys());</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (geom instanceof CadGeometry.GeoLine3D g)      return encodeLineOrRegion3D(g.numSub(), g.subPointCounts(), g.xs(), g.ys(), g.zs());</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (geom instanceof CadGeometry.GeoRegion g)      return encodeLineOrRegion2D(g.numSub(), g.subPointCounts(), g.xs(), g.ys());</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (geom instanceof CadGeometry.GeoRegion3D g)    return encodeLineOrRegion3D(g.numSub(), g.subPointCounts(), g.xs(), g.ys(), g.zs());</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (geom instanceof CadGeometry.GeoRect g)        return encodeGeoRect(g);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (geom instanceof CadGeometry.GeoCircle g)      return encodeGeoCircle(g);</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (geom instanceof CadGeometry.GeoEllipse g)     return encodeGeoEllipse(g);</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (geom instanceof CadGeometry.GeoPie g)         return encodeGeoPie(g);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (geom instanceof CadGeometry.GeoArc g)         return encodeGeoArc(g);</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (geom instanceof CadGeometry.GeoEllipticArc g) return encodeGeoEllipticArc(g);</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (geom instanceof CadGeometry.GeoCurveObject g) return encodeCurveObject(g);</span>
+<span class="nc" id="L165">        throw new IllegalArgumentException(&quot;Unknown CadGeometry type: &quot; + geom.getClass());</span>
+    }
+
+    // ── 点 ───────────────────────────────────────────────────────────────────
+
+    private static byte[] encodeGeoPoint(CadGeometry.GeoPoint g) {
+<span class="fc" id="L171">        ByteBuffer buf = ByteBuffer.allocate(16).order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L172">        buf.putDouble(g.x());</span>
+<span class="fc" id="L173">        buf.putDouble(g.y());</span>
+<span class="fc" id="L174">        return buf.array();</span>
+    }
+
+    private static byte[] encodeGeoPoint3D(CadGeometry.GeoPoint3D g) {
+<span class="fc" id="L178">        ByteBuffer buf = ByteBuffer.allocate(24).order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L179">        buf.putDouble(g.x());</span>
+<span class="fc" id="L180">        buf.putDouble(g.y());</span>
+<span class="fc" id="L181">        buf.putDouble(g.z());</span>
+<span class="fc" id="L182">        return buf.array();</span>
+    }
+
+    // ── 线 / 面 ──────────────────────────────────────────────────────────────
+
+    private static byte[] encodeLineOrRegion2D(int numSub, int[] subCounts, double[] xs, double[] ys) {
+<span class="fc" id="L188">        int totalPts = xs.length;</span>
+<span class="fc" id="L189">        ByteBuffer buf = ByteBuffer.allocate(4 + numSub * 4 + totalPts * 16)</span>
+<span class="fc" id="L190">                .order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L191">        buf.putInt(numSub);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (int c : subCounts) buf.putInt(c);</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        for (int i = 0; i &lt; totalPts; i++) {</span>
+<span class="fc" id="L194">            buf.putDouble(xs[i]);</span>
+<span class="fc" id="L195">            buf.putDouble(ys[i]);</span>
+        }
+<span class="fc" id="L197">        return buf.array();</span>
+    }
+
+    private static byte[] encodeLineOrRegion3D(int numSub, int[] subCounts,
+                                                double[] xs, double[] ys, double[] zs) {
+<span class="fc" id="L202">        int totalPts = xs.length;</span>
+<span class="fc" id="L203">        ByteBuffer buf = ByteBuffer.allocate(4 + numSub * 4 + totalPts * 24)</span>
+<span class="fc" id="L204">                .order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L205">        buf.putInt(numSub);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        for (int c : subCounts) buf.putInt(c);</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        for (int i = 0; i &lt; totalPts; i++) {</span>
+<span class="fc" id="L208">            buf.putDouble(xs[i]);</span>
+<span class="fc" id="L209">            buf.putDouble(ys[i]);</span>
+<span class="fc" id="L210">            buf.putDouble(zs[i]);</span>
+        }
+<span class="fc" id="L212">        return buf.array();</span>
+    }
+
+    // ── 参数化几何 ────────────────────────────────────────────────────────────
+
+    private static byte[] encodeGeoRect(CadGeometry.GeoRect g) {
+<span class="fc" id="L218">        ByteBuffer buf = ByteBuffer.allocate(40).order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L219">        buf.putDouble(g.centerX());</span>
+<span class="fc" id="L220">        buf.putDouble(g.centerY());</span>
+<span class="fc" id="L221">        buf.putDouble(g.width());</span>
+<span class="fc" id="L222">        buf.putDouble(g.height());</span>
+<span class="fc" id="L223">        buf.putInt(g.angle());</span>
+<span class="fc" id="L224">        buf.putInt(0); // reserved</span>
+<span class="fc" id="L225">        return buf.array();</span>
+    }
+
+    private static byte[] encodeGeoCircle(CadGeometry.GeoCircle g) {
+<span class="fc" id="L229">        ByteBuffer buf = ByteBuffer.allocate(24).order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L230">        buf.putDouble(g.centerX());</span>
+<span class="fc" id="L231">        buf.putDouble(g.centerY());</span>
+<span class="fc" id="L232">        buf.putDouble(g.radius());</span>
+<span class="fc" id="L233">        return buf.array();</span>
+    }
+
+    private static byte[] encodeGeoEllipse(CadGeometry.GeoEllipse g) {
+<span class="fc" id="L237">        ByteBuffer buf = ByteBuffer.allocate(40).order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L238">        buf.putDouble(g.centerX());</span>
+<span class="fc" id="L239">        buf.putDouble(g.centerY());</span>
+<span class="fc" id="L240">        buf.putDouble(g.semimajoraxis());</span>
+<span class="fc" id="L241">        buf.putDouble(g.semiminoraxis());</span>
+<span class="fc" id="L242">        buf.putInt(g.angle());</span>
+<span class="fc" id="L243">        buf.putInt(0); // reserved</span>
+<span class="fc" id="L244">        return buf.array();</span>
+    }
+
+    private static byte[] encodeGeoPie(CadGeometry.GeoPie g) {
+<span class="fc" id="L248">        ByteBuffer buf = ByteBuffer.allocate(48).order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L249">        buf.putDouble(g.centerX());</span>
+<span class="fc" id="L250">        buf.putDouble(g.centerY());</span>
+<span class="fc" id="L251">        buf.putDouble(g.semimajoraxis());</span>
+<span class="fc" id="L252">        buf.putDouble(g.semiminoraxis());</span>
+<span class="fc" id="L253">        buf.putInt(g.rotationangle());</span>
+<span class="fc" id="L254">        buf.putInt(g.startangle());</span>
+<span class="fc" id="L255">        buf.putInt(g.endangle());</span>
+<span class="fc" id="L256">        buf.putInt(0); // reserved</span>
+<span class="fc" id="L257">        return buf.array();</span>
+    }
+
+    private static byte[] encodeGeoArc(CadGeometry.GeoArc g) {
+<span class="fc" id="L261">        ByteBuffer buf = ByteBuffer.allocate(48).order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L262">        buf.putDouble(g.startX());</span>
+<span class="fc" id="L263">        buf.putDouble(g.startY());</span>
+<span class="fc" id="L264">        buf.putDouble(g.middleX());</span>
+<span class="fc" id="L265">        buf.putDouble(g.middleY());</span>
+<span class="fc" id="L266">        buf.putDouble(g.endX());</span>
+<span class="fc" id="L267">        buf.putDouble(g.endY());</span>
+<span class="fc" id="L268">        return buf.array();</span>
+    }
+
+    private static byte[] encodeGeoEllipticArc(CadGeometry.GeoEllipticArc g) {
+<span class="fc" id="L272">        ByteBuffer buf = ByteBuffer.allocate(48).order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L273">        buf.putDouble(g.centerX());</span>
+<span class="fc" id="L274">        buf.putDouble(g.centerY());</span>
+<span class="fc" id="L275">        buf.putDouble(g.semimajoraxis());</span>
+<span class="fc" id="L276">        buf.putDouble(g.semiminoraxis());</span>
+<span class="fc" id="L277">        buf.putInt(g.rotationangle());</span>
+<span class="fc" id="L278">        buf.putInt(g.startangle());</span>
+<span class="fc" id="L279">        buf.putInt(g.endangle());</span>
+<span class="fc" id="L280">        buf.putInt(0); // reserved</span>
+<span class="fc" id="L281">        return buf.array();</span>
+    }
+
+    private static byte[] encodeCurveObject(CadGeometry.GeoCurveObject g) {
+<span class="fc" id="L285">        int numPnts = g.xs().length;</span>
+<span class="fc" id="L286">        ByteBuffer buf = ByteBuffer.allocate(4 + numPnts * 16).order(ByteOrder.LITTLE_ENDIAN);</span>
+<span class="fc" id="L287">        buf.putInt(numPnts);</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        for (int i = 0; i &lt; numPnts; i++) {</span>
+<span class="fc" id="L289">            buf.putDouble(g.xs()[i]);</span>
+<span class="fc" id="L290">            buf.putDouble(g.ys()[i]);</span>
+        }
+<span class="fc" id="L292">        return buf.array();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SmRegisterDao.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">udbx4j</a> &gt; <a href="index.source.html" class="el_package">com.supermap.udbx.system</a> &gt; <span class="el_source">SmRegisterDao.java</span></div><h1>SmRegisterDao.java</h1><pre class="source lang-java linenums">package com.supermap.udbx.system;
+
+import com.supermap.udbx.core.DatasetInfo;
+import com.supermap.udbx.core.DatasetType;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * SmRegister 系统表的数据访问对象。
+ *
+ * &lt;p&gt;对应白皮书 §2.1 表 5 SmRegister 字段定义。
+ * 提供对矢量数据集元信息的 CRUD 操作。
+ */
+public class SmRegisterDao {
+
+    private final Connection conn;
+
+<span class="fc" id="L24">    public SmRegisterDao(Connection conn) {</span>
+<span class="fc" id="L25">        this.conn = conn;</span>
+<span class="fc" id="L26">    }</span>
+
+    /**
+     * 查询所有数据集元信息。
+     *
+     * @return 数据集元信息列表
+     * @throws SQLException 查询失败时抛出
+     */
+    public List&lt;DatasetInfo&gt; findAll() throws SQLException {
+<span class="nc" id="L35">        String sql = &quot;SELECT SmDatasetID, SmDatasetName, SmDatasetType, SmObjectCount, SmSRID FROM SmRegister ORDER BY SmDatasetID&quot;;</span>
+<span class="nc" id="L36">        List&lt;DatasetInfo&gt; results = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L38">        try (PreparedStatement stmt = conn.prepareStatement(sql);</span>
+<span class="nc" id="L39">             ResultSet rs = stmt.executeQuery()) {</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">            while (rs.next()) {</span>
+<span class="nc" id="L41">                results.add(mapRow(rs));</span>
+            }
+        }
+<span class="nc" id="L44">        return results;</span>
+    }
+
+    /**
+     * 根据数据集 ID 查询元信息。
+     *
+     * @param datasetId 数据集 ID
+     * @return 数据集元信息（如果存在）
+     * @throws SQLException 查询失败时抛出
+     */
+    public Optional&lt;DatasetInfo&gt; findById(int datasetId) throws SQLException {
+<span class="nc" id="L55">        String sql = &quot;SELECT SmDatasetID, SmDatasetName, SmDatasetType, SmObjectCount, SmSRID FROM SmRegister WHERE SmDatasetID = ?&quot;;</span>
+
+<span class="nc" id="L57">        try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="nc" id="L58">            stmt.setInt(1, datasetId);</span>
+<span class="nc" id="L59">            try (ResultSet rs = stmt.executeQuery()) {</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">                if (rs.next()) {</span>
+<span class="nc" id="L61">                    return Optional.of(mapRow(rs));</span>
+                }
+<span class="nc bnc" id="L63" title="All 2 branches missed.">            }</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        }</span>
+<span class="nc" id="L65">        return Optional.empty();</span>
+    }
+
+    /**
+     * 根据数据集名称查询元信息。
+     *
+     * @param datasetName 数据集名称
+     * @return 数据集元信息（如果存在）
+     * @throws SQLException 查询失败时抛出
+     */
+    public Optional&lt;DatasetInfo&gt; findByName(String datasetName) throws SQLException {
+<span class="fc" id="L76">        String sql = &quot;SELECT SmDatasetID, SmDatasetName, SmDatasetType, SmObjectCount, SmSRID FROM SmRegister WHERE SmDatasetName = ?&quot;;</span>
+
+<span class="fc" id="L78">        try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="fc" id="L79">            stmt.setString(1, datasetName);</span>
+<span class="fc" id="L80">            try (ResultSet rs = stmt.executeQuery()) {</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                if (rs.next()) {</span>
+<span class="fc" id="L82">                    return Optional.of(mapRow(rs));</span>
+                }
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            }</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        }</span>
+<span class="nc" id="L86">        return Optional.empty();</span>
+    }
+
+    private DatasetInfo mapRow(ResultSet rs) throws SQLException {
+<span class="fc" id="L90">        int datasetId = rs.getInt(&quot;SmDatasetID&quot;);</span>
+<span class="fc" id="L91">        String datasetName = rs.getString(&quot;SmDatasetName&quot;);</span>
+<span class="fc" id="L92">        int datasetTypeValue = rs.getInt(&quot;SmDatasetType&quot;);</span>
+<span class="fc" id="L93">        int objectCount = rs.getInt(&quot;SmObjectCount&quot;);</span>
+<span class="fc" id="L94">        int srid = rs.getInt(&quot;SmSRID&quot;);</span>
+
+<span class="fc" id="L96">        DatasetType datasetType = DatasetType.fromValue(datasetTypeValue);</span>
+
+<span class="fc" id="L98">        return new DatasetInfo(datasetId, datasetName, datasetType, objectCount, srid);</span>
+    }
+
+    /**
+     * 在 SmRegister 中插入新数据集记录（SmDatasetID 自动取最大 ID + 1）。
+     *
+     * @param datasetName  数据集名称
+     * @param datasetType  数据集类型
+     * @param srid         坐标系 ID
+     * @param idColName    ID 列名（通常为 &quot;SmID&quot;）
+     * @param geoColName   几何列名（通常为 &quot;SmGeometry&quot;，Tabular 为 null）
+     * @return 分配的 SmDatasetID
+     * @throws SQLException 操作失败时抛出
+     */
+    public int insert(String datasetName, DatasetType datasetType, int srid,
+                      String idColName, String geoColName) throws SQLException {
+<span class="nc" id="L114">        int newId = nextDatasetId();</span>
+<span class="nc" id="L115">        String sql = &quot;INSERT INTO SmRegister &quot; +</span>
+                &quot;(SmDatasetID, SmDatasetName, SmTableName, SmDatasetType, SmObjectCount, &quot; +
+                &quot; SmSRID, SmIDColName, SmGeoColName, SmMaxGeometrySize, SmCreateTime, SmLastUpdateTime) &quot; +
+                &quot;VALUES (?, ?, ?, ?, 0, ?, ?, ?, 0, datetime('now'), datetime('now'))&quot;;
+
+<span class="nc" id="L120">        try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="nc" id="L121">            stmt.setInt(1, newId);</span>
+<span class="nc" id="L122">            stmt.setString(2, datasetName);</span>
+<span class="nc" id="L123">            stmt.setString(3, datasetName);   // SmTableName = 数据集名称</span>
+<span class="nc" id="L124">            stmt.setInt(4, datasetType.getValue());</span>
+<span class="nc" id="L125">            stmt.setInt(5, srid);</span>
+<span class="nc" id="L126">            stmt.setString(6, idColName);</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            if (geoColName != null) {</span>
+<span class="nc" id="L128">                stmt.setString(7, geoColName);</span>
+            } else {
+<span class="nc" id="L130">                stmt.setNull(7, java.sql.Types.VARCHAR);</span>
+            }
+<span class="nc" id="L132">            stmt.executeUpdate();</span>
+        }
+<span class="nc" id="L134">        return newId;</span>
+    }
+
+    /**
+     * 更新 SmRegister 中数据集的要素计数与最大几何尺寸。
+     *
+     * @param datasetId       数据集 ID
+     * @param newBlobSize     新插入的 Geometry BLOB 字节数
+     * @throws SQLException 操作失败时抛出
+     */
+    public void incrementObjectCount(int datasetId, int newBlobSize) throws SQLException {
+<span class="nc" id="L145">        String sql = &quot;UPDATE SmRegister &quot; +</span>
+                &quot;SET SmObjectCount = SmObjectCount + 1, &quot; +
+                &quot;    SmMaxGeometrySize = CASE WHEN SmMaxGeometrySize &lt; ? THEN ? ELSE SmMaxGeometrySize END &quot; +
+                &quot;WHERE SmDatasetID = ?&quot;;
+<span class="nc" id="L149">        try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="nc" id="L150">            stmt.setInt(1, newBlobSize);</span>
+<span class="nc" id="L151">            stmt.setInt(2, newBlobSize);</span>
+<span class="nc" id="L152">            stmt.setInt(3, datasetId);</span>
+<span class="nc" id="L153">            stmt.executeUpdate();</span>
+        }
+<span class="nc" id="L155">    }</span>
+
+    /**
+     * 仅递增 SmObjectCount（用于无几何数据集）。
+     */
+    public void incrementObjectCount(int datasetId) throws SQLException {
+<span class="nc" id="L161">        String sql = &quot;UPDATE SmRegister SET SmObjectCount = SmObjectCount + 1 WHERE SmDatasetID = ?&quot;;</span>
+<span class="nc" id="L162">        try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="nc" id="L163">            stmt.setInt(1, datasetId);</span>
+<span class="nc" id="L164">            stmt.executeUpdate();</span>
+        }
+<span class="nc" id="L166">    }</span>
+
+    /**
+     * 递减 SmObjectCount（用于删除要素）。
+     *
+     * @param datasetId 数据集 ID
+     * @throws SQLException 操作失败时抛出
+     */
+    public void decrementObjectCount(int datasetId) throws SQLException {
+<span class="nc" id="L175">        String sql = &quot;UPDATE SmRegister SET SmObjectCount = SmObjectCount - 1 WHERE SmDatasetID = ? AND SmObjectCount &gt; 0&quot;;</span>
+<span class="nc" id="L176">        try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="nc" id="L177">            stmt.setInt(1, datasetId);</span>
+<span class="nc" id="L178">            stmt.executeUpdate();</span>
+        }
+<span class="nc" id="L180">    }</span>
+
+    private int nextDatasetId() throws SQLException {
+<span class="nc" id="L183">        String sql = &quot;SELECT COALESCE(MAX(SmDatasetID), 0) + 1 FROM SmRegister&quot;;</span>
+<span class="nc" id="L184">        try (PreparedStatement stmt = conn.prepareStatement(sql);</span>
+<span class="nc" id="L185">             ResultSet rs = stmt.executeQuery()) {</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            return rs.next() ? rs.getInt(1) : 1;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

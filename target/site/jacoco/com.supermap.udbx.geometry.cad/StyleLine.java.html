@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StyleLine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">udbx4j</a> &gt; <a href="index.source.html" class="el_package">com.supermap.udbx.geometry.cad</a> &gt; <span class="el_source">StyleLine.java</span></div><h1>StyleLine.java</h1><pre class="source lang-java linenums">package com.supermap.udbx.geometry.cad;
+
+/**
+ * 线符号风格（StyleLine）。
+ *
+ * &lt;p&gt;对应白皮书 §4.3.1.2。Color 字段以 int32 存储，ABGR 字节顺序。
+ *
+ * @param lineStyle  线符号在符号库中的 ID
+ * @param lineWidth  线宽，单位 0.1mm
+ * @param lineColor  线颜色（ABGR int32）
+ */
+<span class="fc" id="L12">public record StyleLine(</span>
+        int lineStyle,
+        int lineWidth,
+        int lineColor
+) implements CadStyle {
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

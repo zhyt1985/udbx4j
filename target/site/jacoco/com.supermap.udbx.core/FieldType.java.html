@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FieldType.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">udbx4j</a> &gt; <a href="index.source.html" class="el_package">com.supermap.udbx.core</a> &gt; <span class="el_source">FieldType.java</span></div><h1>FieldType.java</h1><pre class="source lang-java linenums">package com.supermap.udbx.core;
+
+/**
+ * SuperMap 字段类型枚举。
+ *
+ * &lt;p&gt;对应白皮书表 9（SmFieldInfo.SmFieldType 字段值）。
+ */
+<span class="fc" id="L8">public enum FieldType {</span>
+
+<span class="fc" id="L10">    Boolean(1),</span>
+<span class="fc" id="L11">    Byte(2),</span>
+<span class="fc" id="L12">    Int16(3),</span>
+<span class="fc" id="L13">    Int32(4),</span>
+<span class="fc" id="L14">    Int64(5),</span>
+<span class="fc" id="L15">    Single(6),</span>
+<span class="fc" id="L16">    Double(7),</span>
+<span class="fc" id="L17">    Date(8),</span>
+<span class="fc" id="L18">    Binary(9),</span>
+<span class="fc" id="L19">    Geometry(10),</span>
+<span class="fc" id="L20">    Char(11),</span>
+<span class="fc" id="L21">    NText(127),</span>
+<span class="fc" id="L22">    Text(128),</span>
+<span class="fc" id="L23">    Time(16);  // TODO: 确认白皮书中的确切名称</span>
+
+    private final int value;
+
+<span class="fc" id="L27">    FieldType(int value) {</span>
+<span class="fc" id="L28">        this.value = value;</span>
+<span class="fc" id="L29">    }</span>
+
+    public int getValue() {
+<span class="fc" id="L32">        return value;</span>
+    }
+
+    public static FieldType fromValue(int value) {
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (FieldType type : values()) {</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            if (type.value == value) {</span>
+<span class="fc" id="L38">                return type;</span>
+            }
+        }
+<span class="fc" id="L41">        throw new IllegalArgumentException(&quot;Unknown FieldType value: &quot; + value);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

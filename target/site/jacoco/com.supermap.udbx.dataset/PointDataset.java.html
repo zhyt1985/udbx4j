@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PointDataset.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">udbx4j</a> &gt; <a href="index.source.html" class="el_package">com.supermap.udbx.dataset</a> &gt; <span class="el_source">PointDataset.java</span></div><h1>PointDataset.java</h1><pre class="source lang-java linenums">package com.supermap.udbx.dataset;
+
+import com.supermap.udbx.core.DatasetInfo;
+import com.supermap.udbx.geometry.gaia.GaiaGeometryReader;
+import com.supermap.udbx.geometry.gaia.GaiaGeometryWriter;
+import com.supermap.udbx.system.SmRegisterDao;
+import org.locationtech.jts.geom.Point;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 点数据集实现（DatasetType=Point，geoType=1）。
+ *
+ * &lt;p&gt;从数据表（如 BaseMap_P）读取点要素，几何数据存储于 SmGeometry 列（GAIA 格式 BLOB）。
+ * 属性数据从数据表的用户字段列读取。
+ *
+ * &lt;p&gt;系统字段（SmID、SmUserID、SmGeometry）已过滤，不出现在 {@link PointFeature#attributes()} 中。
+ */
+public class PointDataset extends VectorDataset {
+
+    /** 数据表中的几何列名（GAIA 格式 BLOB）。 */
+    private static final String GEOMETRY_COLUMN = &quot;SmGeometry&quot;;
+
+    /** 数据表中的系统字段前缀（以此开头的列不计入用户属性）。 */
+    private static final String SYSTEM_COLUMN_PREFIX = &quot;Sm&quot;;
+
+    public PointDataset(Connection conn, DatasetInfo info) {
+<span class="fc" id="L36">        super(conn, info);</span>
+<span class="fc" id="L37">    }</span>
+
+    /**
+     * 读取该数据集中的所有点要素。
+     *
+     * @return 要素列表（按 SmID 升序）
+     * @throws RuntimeException 若数据库查询失败
+     */
+    public List&lt;PointFeature&gt; getFeatures() {
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (!tableExists()) return List.of();</span>
+<span class="fc" id="L47">        String sql = &quot;SELECT * FROM \&quot;&quot; + getTableName() + &quot;\&quot; ORDER BY SmID&quot;;</span>
+<span class="fc" id="L48">        List&lt;PointFeature&gt; features = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L50">        try (PreparedStatement stmt = conn.prepareStatement(sql);</span>
+<span class="fc" id="L51">             ResultSet rs = stmt.executeQuery()) {</span>
+<span class="fc" id="L52">            List&lt;String&gt; userColumns = resolveUserColumns(rs.getMetaData());</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            while (rs.next()) {</span>
+<span class="fc" id="L54">                features.add(mapRow(rs, userColumns));</span>
+            }
+<span class="nc" id="L56">        } catch (SQLException e) {</span>
+<span class="nc" id="L57">            throw new RuntimeException(&quot;读取点数据集 [&quot; + getName() + &quot;] 失败&quot;, e);</span>
+<span class="fc" id="L58">        }</span>
+<span class="fc" id="L59">        return features;</span>
+    }
+
+    /**
+     * 根据 SmID 读取单个点要素。
+     *
+     * @param smId 要素 SmID
+     * @return 要素对象，不存在时返回 {@code null}
+     * @throws RuntimeException 若数据库查询失败
+     */
+    public PointFeature getFeature(int smId) {
+<span class="fc" id="L70">        String sql = &quot;SELECT * FROM \&quot;&quot; + getTableName() + &quot;\&quot; WHERE SmID = ?&quot;;</span>
+
+<span class="fc" id="L72">        try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="fc" id="L73">            stmt.setInt(1, smId);</span>
+<span class="fc" id="L74">            try (ResultSet rs = stmt.executeQuery()) {</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">                if (!rs.next()) {</span>
+<span class="fc" id="L76">                    return null;</span>
+                }
+<span class="fc" id="L78">                List&lt;String&gt; userColumns = resolveUserColumns(rs.getMetaData());</span>
+<span class="fc" id="L79">                return mapRow(rs, userColumns);</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            }</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        } catch (SQLException e) {</span>
+<span class="nc" id="L82">            throw new RuntimeException(&quot;读取点要素 SmID=&quot; + smId + &quot; 失败&quot;, e);</span>
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 写入方法
+    // -----------------------------------------------------------------------
+
+    /**
+     * 向数据集中写入一个点要素。
+     *
+     * &lt;p&gt;自动更新 SmRegister 中的 SmObjectCount 和 SmMaxGeometrySize。
+     * 每次调用都包含在一个独立事务中。
+     *
+     * @param smId       要素 SmID（必须唯一）
+     * @param geometry   JTS Point（2D）
+     * @param attributes 用户属性字段（暂不写入，预留接口）
+     * @throws RuntimeException 若写入失败
+     */
+    public void addFeature(int smId, Point geometry, Map&lt;String, Object&gt; attributes) {
+<span class="fc" id="L102">        byte[] geomBytes = GaiaGeometryWriter.writePoint(geometry, info.srid());</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        List&lt;String&gt; attrKeys = attributes == null ? java.util.List.of() : new ArrayList&lt;&gt;(attributes.keySet());</span>
+
+<span class="fc" id="L105">        StringBuilder sqlBuf = new StringBuilder(&quot;INSERT INTO \&quot;&quot;).append(getTableName())</span>
+<span class="fc" id="L106">                .append(&quot;\&quot; (SmID, SmUserID, \&quot;SmGeometry\&quot;&quot;);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (String key : attrKeys) {</span>
+<span class="fc" id="L108">            sqlBuf.append(&quot;, \&quot;&quot;).append(key).append(&quot;\&quot;&quot;);</span>
+<span class="fc" id="L109">        }</span>
+<span class="fc" id="L110">        sqlBuf.append(&quot;) VALUES (?, 0, ?&quot;);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (int i = 0; i &lt; attrKeys.size(); i++) {</span>
+<span class="fc" id="L112">            sqlBuf.append(&quot;, ?&quot;);</span>
+        }
+<span class="fc" id="L114">        sqlBuf.append(&quot;)&quot;);</span>
+
+        try {
+<span class="fc" id="L117">            conn.setAutoCommit(false);</span>
+<span class="fc" id="L118">            try (PreparedStatement stmt = conn.prepareStatement(sqlBuf.toString())) {</span>
+<span class="fc" id="L119">                stmt.setInt(1, smId);</span>
+<span class="fc" id="L120">                stmt.setBytes(2, geomBytes);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                for (int i = 0; i &lt; attrKeys.size(); i++) {</span>
+<span class="fc" id="L122">                    stmt.setObject(3 + i, attributes.get(attrKeys.get(i)));</span>
+                }
+<span class="fc" id="L124">                stmt.executeUpdate();</span>
+            }
+<span class="fc" id="L126">            new SmRegisterDao(conn).incrementObjectCount(info.datasetId(), geomBytes.length);</span>
+<span class="fc" id="L127">            conn.commit();</span>
+<span class="nc" id="L128">        } catch (SQLException e) {</span>
+<span class="nc" id="L129">            try { conn.rollback(); } catch (SQLException ignored) {}</span>
+<span class="nc" id="L130">            throw new RuntimeException(&quot;写入点要素 SmID=&quot; + smId + &quot; 失败&quot;, e);</span>
+        } finally {
+<span class="pc" id="L132">            try { conn.setAutoCommit(true); } catch (SQLException ignored) {}</span>
+        }
+<span class="fc" id="L134">    }</span>
+
+    /**
+     * 删除指定 SmID 的点要素。
+     *
+     * @param smId 要素 SmID
+     * @throws RuntimeException 若要素不存在或删除失败
+     */
+    public void deleteFeature(int smId) {
+<span class="fc" id="L143">        String tableName = info.datasetName();</span>
+<span class="fc" id="L144">        String sql = &quot;DELETE FROM \&quot;&quot; + tableName + &quot;\&quot; WHERE SmID = ?&quot;;</span>
+
+        try {
+<span class="fc" id="L147">            conn.setAutoCommit(false);</span>
+<span class="fc" id="L148">            try (PreparedStatement stmt = conn.prepareStatement(sql)) {</span>
+<span class="fc" id="L149">                stmt.setInt(1, smId);</span>
+<span class="fc" id="L150">                int affected = stmt.executeUpdate();</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">                if (affected == 0) {</span>
+<span class="fc" id="L152">                    throw new SQLException(&quot;SmID=&quot; + smId + &quot; 不存在&quot;);</span>
+                }
+            }
+<span class="fc" id="L155">            new SmRegisterDao(conn).decrementObjectCount(info.datasetId());</span>
+<span class="fc" id="L156">            conn.commit();</span>
+<span class="fc" id="L157">        } catch (SQLException e) {</span>
+<span class="pc" id="L158">            try { conn.rollback(); } catch (SQLException ignored) {}</span>
+<span class="fc" id="L159">            throw new RuntimeException(&quot;删除点要素 SmID=&quot; + smId + &quot; 失败: &quot; + e.getMessage(), e);</span>
+        } finally {
+<span class="pc" id="L161">            try { conn.setAutoCommit(true); } catch (SQLException ignored) {}</span>
+        }
+<span class="fc" id="L163">    }</span>
+
+    /**
+     * 更新指定 SmID 的点要素。
+     *
+     * @param smId       要素 SmID
+     * @param geometry   新几何（可为 null 表示不更新几何）
+     * @param attributes 新属性（可为 null 表示不更新属性）
+     * @throws RuntimeException 若要素不存在或更新失败
+     */
+    public void updateFeature(int smId, Point geometry, Map&lt;String, Object&gt; attributes) {
+<span class="fc" id="L174">        String tableName = info.datasetName();</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        List&lt;String&gt; attrKeys = attributes == null ? List.of() : new ArrayList&lt;&gt;(attributes.keySet());</span>
+
+        // 构建动态 UPDATE SQL
+<span class="fc" id="L178">        StringBuilder sqlBuf = new StringBuilder(&quot;UPDATE \&quot;&quot;).append(tableName).append(&quot;\&quot; SET &quot;);</span>
+<span class="fc" id="L179">        boolean hasSet = false;</span>
+
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (geometry != null) {</span>
+<span class="fc" id="L182">            sqlBuf.append(&quot;\&quot;SmGeometry\&quot; = ?&quot;);</span>
+<span class="fc" id="L183">            hasSet = true;</span>
+        }
+
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        for (String key : attrKeys) {</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            if (hasSet) sqlBuf.append(&quot;, &quot;);</span>
+<span class="fc" id="L188">            sqlBuf.append(&quot;\&quot;&quot;).append(key).append(&quot;\&quot; = ?&quot;);</span>
+<span class="fc" id="L189">            hasSet = true;</span>
+<span class="fc" id="L190">        }</span>
+
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (!hasSet) {</span>
+<span class="nc" id="L193">            return; // 无更新内容</span>
+        }
+
+<span class="fc" id="L196">        sqlBuf.append(&quot; WHERE SmID = ?&quot;);</span>
+
+        try {
+<span class="fc" id="L199">            conn.setAutoCommit(false);</span>
+<span class="fc" id="L200">            try (PreparedStatement stmt = conn.prepareStatement(sqlBuf.toString())) {</span>
+<span class="fc" id="L201">                int paramIdx = 1;</span>
+
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                if (geometry != null) {</span>
+<span class="fc" id="L204">                    byte[] geomBytes = GaiaGeometryWriter.writePoint(geometry, info.srid());</span>
+<span class="fc" id="L205">                    stmt.setBytes(paramIdx++, geomBytes);</span>
+                }
+
+<span class="fc bfc" id="L208" title="All 2 branches covered.">                for (String key : attrKeys) {</span>
+<span class="fc" id="L209">                    stmt.setObject(paramIdx++, attributes.get(key));</span>
+<span class="fc" id="L210">                }</span>
+
+<span class="fc" id="L212">                stmt.setInt(paramIdx, smId);</span>
+<span class="fc" id="L213">                int affected = stmt.executeUpdate();</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">                if (affected == 0) {</span>
+<span class="fc" id="L215">                    throw new SQLException(&quot;SmID=&quot; + smId + &quot; 不存在&quot;);</span>
+                }
+            }
+<span class="fc" id="L218">            conn.commit();</span>
+<span class="fc" id="L219">        } catch (SQLException e) {</span>
+<span class="pc" id="L220">            try { conn.rollback(); } catch (SQLException ignored) {}</span>
+<span class="fc" id="L221">            throw new RuntimeException(&quot;更新点要素 SmID=&quot; + smId + &quot; 失败: &quot; + e.getMessage(), e);</span>
+        } finally {
+<span class="pc" id="L223">            try { conn.setAutoCommit(true); } catch (SQLException ignored) {}</span>
+        }
+<span class="fc" id="L225">    }</span>
+
+    // -----------------------------------------------------------------------
+    // 私有辅助方法
+    // -----------------------------------------------------------------------
+
+    /**
+     * 从 ResultSetMetaData 中提取用户字段列名（排除系统字段）。
+     *
+     * &lt;p&gt;系统字段规则：列名以 &quot;Sm&quot; 开头（大小写敏感）。
+     */
+    private List&lt;String&gt; resolveUserColumns(ResultSetMetaData meta) throws SQLException {
+<span class="fc" id="L237">        List&lt;String&gt; columns = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L238">        int count = meta.getColumnCount();</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        for (int i = 1; i &lt;= count; i++) {</span>
+<span class="fc" id="L240">            String name = meta.getColumnName(i);</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">            if (!name.startsWith(SYSTEM_COLUMN_PREFIX)) {</span>
+<span class="fc" id="L242">                columns.add(name);</span>
+            }
+        }
+<span class="fc" id="L245">        return columns;</span>
+    }
+
+    /**
+     * 将当前行映射为 PointFeature。
+     *
+     * @param rs          ResultSet（已定位到目标行）
+     * @param userColumns 用户字段列名列表
+     */
+    private PointFeature mapRow(ResultSet rs, List&lt;String&gt; userColumns) throws SQLException {
+<span class="fc" id="L255">        int smId = rs.getInt(&quot;SmID&quot;);</span>
+<span class="fc" id="L256">        byte[] geomBytes = rs.getBytes(GEOMETRY_COLUMN);</span>
+<span class="fc" id="L257">        Point geometry = GaiaGeometryReader.readPoint(geomBytes);</span>
+
+<span class="fc" id="L259">        Map&lt;String, Object&gt; attributes = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        for (String col : userColumns) {</span>
+<span class="fc" id="L261">            attributes.put(col, rs.getObject(col));</span>
+<span class="fc" id="L262">        }</span>
+
+<span class="fc" id="L264">        return new PointFeature(smId, geometry, attributes);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

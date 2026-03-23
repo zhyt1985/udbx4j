@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UdbxDataSource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">udbx4j</a> &gt; <a href="index.source.html" class="el_package">com.supermap.udbx</a> &gt; <span class="el_source">UdbxDataSource.java</span></div><h1>UdbxDataSource.java</h1><pre class="source lang-java linenums">package com.supermap.udbx;
+
+import com.supermap.udbx.core.DatasetInfo;
+import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.core.FieldInfo;
+import com.supermap.udbx.core.FieldType;
+import com.supermap.udbx.dataset.CadDataset;
+import com.supermap.udbx.dataset.Dataset;
+import com.supermap.udbx.dataset.LineDataset;
+import com.supermap.udbx.dataset.LineZDataset;
+import com.supermap.udbx.dataset.PointDataset;
+import com.supermap.udbx.dataset.PointZDataset;
+import com.supermap.udbx.dataset.RegionDataset;
+import com.supermap.udbx.dataset.RegionZDataset;
+import com.supermap.udbx.dataset.TabularDataset;
+import com.supermap.udbx.system.SmFieldInfoDao;
+import com.supermap.udbx.system.SmRegisterDao;
+import com.supermap.udbx.system.UdbxSchemaInitializer;
+
+import java.io.File;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * UDBX 数据源入口类。
+ *
+ * &lt;p&gt;负责打开或创建 .udbx 文件（SQLite 数据库），管理 Connection 生命周期，
+ * 并根据 SmRegister 元信息创建具体数据集实例。
+ *
+ * &lt;p&gt;使用示例（读取）：
+ * &lt;pre&gt;{@code
+ * try (UdbxDataSource ds = UdbxDataSource.open(&quot;path/to/file.udbx&quot;)) {
+ *     PointDataset points = (PointDataset) ds.getDataset(&quot;BaseMap_P&quot;);
+ *     List&lt;PointFeature&gt; features = points.getFeatures();
+ * }
+ * }&lt;/pre&gt;
+ *
+ * &lt;p&gt;使用示例（创建写入）：
+ * &lt;pre&gt;{@code
+ * try (UdbxDataSource ds = UdbxDataSource.create(&quot;path/to/new.udbx&quot;)) {
+ *     PointDataset pd = ds.createPointDataset(&quot;MyPoints&quot;, 4326);
+ *     pd.addFeature(1, point, Map.of());
+ * }
+ * }&lt;/pre&gt;
+ */
+public class UdbxDataSource implements AutoCloseable {
+
+    private final Connection conn;
+    private final SmRegisterDao registerDao;
+
+<span class="fc" id="L56">    private UdbxDataSource(Connection conn) {</span>
+<span class="fc" id="L57">        this.conn = conn;</span>
+<span class="fc" id="L58">        this.registerDao = new SmRegisterDao(conn);</span>
+<span class="fc" id="L59">    }</span>
+
+    /**
+     * 打开指定路径的已有 UDBX 文件。
+     *
+     * @param path .udbx 文件路径
+     * @return UdbxDataSource 实例
+     * @throws RuntimeException 若无法打开文件或建立连接
+     */
+    public static UdbxDataSource open(String path) {
+        try {
+<span class="fc" id="L70">            Connection conn = DriverManager.getConnection(&quot;jdbc:sqlite:&quot; + path);</span>
+<span class="fc" id="L71">            return new UdbxDataSource(conn);</span>
+<span class="nc" id="L72">        } catch (SQLException e) {</span>
+<span class="nc" id="L73">            throw new RuntimeException(&quot;无法打开 UDBX 文件: &quot; + path, e);</span>
+        }
+    }
+
+    /**
+     * 创建一个全新的 UDBX 文件并初始化系统表。
+     *
+     * &lt;p&gt;若文件已存在则抛出异常，不覆盖已有数据。
+     *
+     * @param path 新文件路径（不能已存在）
+     * @return 已初始化的 UdbxDataSource 实例
+     * @throws RuntimeException 若文件已存在或创建失败
+     */
+    public static UdbxDataSource create(String path) {
+<span class="nc" id="L87">        File file = new File(path);</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (file.exists()) {</span>
+<span class="nc" id="L89">            throw new RuntimeException(&quot;文件已存在，无法创建新 UDBX 文件: &quot; + path);</span>
+        }
+        try {
+<span class="nc" id="L92">            Connection conn = DriverManager.getConnection(&quot;jdbc:sqlite:&quot; + path);</span>
+<span class="nc" id="L93">            UdbxSchemaInitializer.initialize(conn);</span>
+<span class="nc" id="L94">            return new UdbxDataSource(conn);</span>
+<span class="nc" id="L95">        } catch (SQLException e) {</span>
+<span class="nc" id="L96">            throw new RuntimeException(&quot;创建 UDBX 文件失败: &quot; + path, e);</span>
+        }
+    }
+
+    /**
+     * 根据数据集名称获取数据集实例。
+     *
+     * @param name 数据集名称（SmDatasetName）
+     * @return 数据集实例，若不存在则返回 {@code null}
+     * @throws RuntimeException 若元信息查询失败或数据集类型不支持
+     */
+    public Dataset getDataset(String name) {
+        try {
+<span class="fc" id="L109">            Optional&lt;DatasetInfo&gt; infoOpt = registerDao.findByName(name);</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (infoOpt.isEmpty()) {</span>
+<span class="nc" id="L111">                return null;</span>
+            }
+<span class="fc" id="L113">            DatasetInfo info = infoOpt.get();</span>
+<span class="fc" id="L114">            return createDataset(info);</span>
+<span class="nc" id="L115">        } catch (SQLException e) {</span>
+<span class="nc" id="L116">            throw new RuntimeException(&quot;查询数据集 [&quot; + name + &quot;] 元信息失败&quot;, e);</span>
+        }
+    }
+
+    // ── 数据集创建工厂方法 ────────────────────────────────────────────────────
+
+    /**
+     * 在当前数据源中创建一个新的点数据集（DatasetType=Point）。
+     *
+     * @param name 数据集名称（同时作为数据表名）
+     * @param srid 坐标系 ID（建议 4326）
+     * @return 可立即使用的 PointDataset 实例
+     * @throws RuntimeException 若建表或注册失败
+     */
+    public PointDataset createPointDataset(String name, int srid) {
+<span class="nc" id="L131">        return createPointDataset(name, srid, Collections.emptyList());</span>
+    }
+
+    /**
+     * 在当前数据源中创建一个新的点数据集（DatasetType=Point），并附带用户字段定义。
+     *
+     * @param name   数据集名称
+     * @param srid   坐标系 ID
+     * @param fields 用户字段列表（不含系统字段）
+     * @return 可立即使用的 PointDataset 实例
+     */
+    public PointDataset createPointDataset(String name, int srid, List&lt;FieldInfo&gt; fields) {
+<span class="nc" id="L143">        return (PointDataset) createVectorDataset(name, DatasetType.Point, srid,</span>
+                &quot;POINT&quot;, 1, 2, fields);
+    }
+
+    /**
+     * 在当前数据源中创建一个新的线数据集（DatasetType=Line）。
+     *
+     * @param name 数据集名称
+     * @param srid 坐标系 ID
+     * @return 可立即使用的 LineDataset 实例
+     */
+    public LineDataset createLineDataset(String name, int srid) {
+<span class="nc" id="L155">        return createLineDataset(name, srid, Collections.emptyList());</span>
+    }
+
+    /**
+     * 在当前数据源中创建一个新的线数据集（DatasetType=Line），并附带用户字段定义。
+     */
+    public LineDataset createLineDataset(String name, int srid, List&lt;FieldInfo&gt; fields) {
+<span class="nc" id="L162">        return (LineDataset) createVectorDataset(name, DatasetType.Line, srid,</span>
+                &quot;MULTILINESTRING&quot;, 5, 2, fields);
+    }
+
+    /**
+     * 在当前数据源中创建一个新的面数据集（DatasetType=Region）。
+     *
+     * @param name 数据集名称
+     * @param srid 坐标系 ID
+     * @return 可立即使用的 RegionDataset 实例
+     */
+    public RegionDataset createRegionDataset(String name, int srid) {
+<span class="nc" id="L174">        return createRegionDataset(name, srid, Collections.emptyList());</span>
+    }
+
+    /**
+     * 在当前数据源中创建一个新的面数据集（DatasetType=Region），并附带用户字段定义。
+     */
+    public RegionDataset createRegionDataset(String name, int srid, List&lt;FieldInfo&gt; fields) {
+<span class="nc" id="L181">        return (RegionDataset) createVectorDataset(name, DatasetType.Region, srid,</span>
+                &quot;MULTIPOLYGON&quot;, 6, 2, fields);
+    }
+
+    // ── 三维矢量数据集工厂方法 ─────────────────────────────────────────────────
+
+    /**
+     * 在当前数据源中创建一个新的三维点数据集（DatasetType=PointZ=101）。
+     */
+    public PointZDataset createPointZDataset(String name, int srid) {
+<span class="nc" id="L191">        return createPointZDataset(name, srid, Collections.emptyList());</span>
+    }
+
+    /**
+     * 在当前数据源中创建一个新的三维点数据集，并附带用户字段定义。
+     */
+    public PointZDataset createPointZDataset(String name, int srid, List&lt;FieldInfo&gt; fields) {
+<span class="nc" id="L198">        return (PointZDataset) createVectorDataset(name, DatasetType.PointZ, srid,</span>
+                &quot;POINT&quot;, 1001, 3, fields);
+    }
+
+    /**
+     * 在当前数据源中创建一个新的三维线数据集（DatasetType=LineZ=103）。
+     */
+    public LineZDataset createLineZDataset(String name, int srid) {
+<span class="nc" id="L206">        return createLineZDataset(name, srid, Collections.emptyList());</span>
+    }
+
+    /**
+     * 在当前数据源中创建一个新的三维线数据集，并附带用户字段定义。
+     */
+    public LineZDataset createLineZDataset(String name, int srid, List&lt;FieldInfo&gt; fields) {
+<span class="nc" id="L213">        return (LineZDataset) createVectorDataset(name, DatasetType.LineZ, srid,</span>
+                &quot;MULTILINESTRING&quot;, 1005, 3, fields);
+    }
+
+    /**
+     * 在当前数据源中创建一个新的三维面数据集（DatasetType=RegionZ=105）。
+     */
+    public RegionZDataset createRegionZDataset(String name, int srid) {
+<span class="nc" id="L221">        return createRegionZDataset(name, srid, Collections.emptyList());</span>
+    }
+
+    /**
+     * 在当前数据源中创建一个新的三维面数据集，并附带用户字段定义。
+     */
+    public RegionZDataset createRegionZDataset(String name, int srid, List&lt;FieldInfo&gt; fields) {
+<span class="nc" id="L228">        return (RegionZDataset) createVectorDataset(name, DatasetType.RegionZ, srid,</span>
+                &quot;MULTIPOLYGON&quot;, 1006, 3, fields);
+    }
+
+    /**
+     * 在当前数据源中创建一个新的属性表数据集（DatasetType=Tabular，无几何）。
+     *
+     * @param name 数据集名称
+     * @return 可立即使用的 TabularDataset 实例
+     */
+    public TabularDataset createTabularDataset(String name) {
+<span class="nc" id="L239">        return createTabularDataset(name, Collections.emptyList());</span>
+    }
+
+    /**
+     * 在当前数据源中创建一个新的属性表数据集（DatasetType=Tabular，无几何），并附带用户字段定义。
+     *
+     * @param name   数据集名称
+     * @param fields 用户字段列表
+     * @return 可立即使用的 TabularDataset 实例
+     */
+    public TabularDataset createTabularDataset(String name, List&lt;FieldInfo&gt; fields) {
+        try {
+<span class="nc" id="L251">            StringBuilder ddl = new StringBuilder(&quot;CREATE TABLE \&quot;&quot;).append(name).append(&quot;\&quot; (&quot;)</span>
+<span class="nc" id="L252">                    .append(&quot;  SmID     INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,&quot;)</span>
+<span class="nc" id="L253">                    .append(&quot;  SmUserID INTEGER DEFAULT 0&quot;);</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">            for (FieldInfo f : fields) {</span>
+<span class="nc" id="L255">                ddl.append(&quot;, \&quot;&quot;).append(f.fieldName()).append(&quot;\&quot; &quot;).append(sqlTypeFor(f.fieldType()));</span>
+<span class="nc" id="L256">            }</span>
+<span class="nc" id="L257">            ddl.append(&quot;)&quot;);</span>
+<span class="nc" id="L258">            try (Statement stmt = conn.createStatement()) {</span>
+<span class="nc" id="L259">                stmt.executeUpdate(ddl.toString());</span>
+            }
+<span class="nc" id="L261">            int datasetId = registerDao.insert(name, DatasetType.Tabular, 0, &quot;SmID&quot;, null);</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">            if (!fields.isEmpty()) {</span>
+<span class="nc" id="L263">                new SmFieldInfoDao(conn).insertAll(datasetId, fields);</span>
+            }
+<span class="nc" id="L265">            DatasetInfo info = new DatasetInfo(datasetId, name, DatasetType.Tabular, 0, 0);</span>
+<span class="nc" id="L266">            return new TabularDataset(conn, info);</span>
+<span class="nc" id="L267">        } catch (SQLException e) {</span>
+<span class="nc" id="L268">            throw new RuntimeException(&quot;创建属性表数据集 [&quot; + name + &quot;] 失败&quot;, e);</span>
+        }
+    }
+
+    public CadDataset createCadDataset(String name) {
+<span class="nc" id="L273">        return createCadDataset(name, Collections.emptyList());</span>
+    }
+
+    /**
+     * 在当前数据源中创建一个新的 CAD 数据集（DatasetType=CAD=149），并附带用户字段定义。
+     *
+     * &lt;p&gt;CAD 数据集不注册到 geometry_columns（使用 SuperMap 自定义 GeoHeader 格式）。
+     */
+    public CadDataset createCadDataset(String name, List&lt;FieldInfo&gt; fields) {
+        try {
+<span class="nc" id="L283">            StringBuilder ddl = new StringBuilder(&quot;CREATE TABLE \&quot;&quot;).append(name).append(&quot;\&quot; (&quot;)</span>
+<span class="nc" id="L284">                    .append(&quot;  SmID       INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,&quot;)</span>
+<span class="nc" id="L285">                    .append(&quot;  SmUserID   INTEGER DEFAULT 0,&quot;)</span>
+<span class="nc" id="L286">                    .append(&quot;  \&quot;SmGeometry\&quot; BLOB&quot;);</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">            for (FieldInfo f : fields) {</span>
+<span class="nc" id="L288">                ddl.append(&quot;, \&quot;&quot;).append(f.fieldName()).append(&quot;\&quot; &quot;).append(sqlTypeFor(f.fieldType()));</span>
+<span class="nc" id="L289">            }</span>
+<span class="nc" id="L290">            ddl.append(&quot;)&quot;);</span>
+<span class="nc" id="L291">            try (Statement stmt = conn.createStatement()) {</span>
+<span class="nc" id="L292">                stmt.executeUpdate(ddl.toString());</span>
+            }
+<span class="nc" id="L294">            int datasetId = registerDao.insert(name, DatasetType.CAD, 0, &quot;SmID&quot;, &quot;SmGeometry&quot;);</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">            if (!fields.isEmpty()) {</span>
+<span class="nc" id="L296">                new SmFieldInfoDao(conn).insertAll(datasetId, fields);</span>
+            }
+<span class="nc" id="L298">            DatasetInfo info = new DatasetInfo(datasetId, name, DatasetType.CAD, 0, 0);</span>
+<span class="nc" id="L299">            return new CadDataset(conn, info);</span>
+<span class="nc" id="L300">        } catch (SQLException e) {</span>
+<span class="nc" id="L301">            throw new RuntimeException(&quot;创建 CAD 数据集 [&quot; + name + &quot;] 失败&quot;, e);</span>
+        }
+    }
+
+    /**
+     * 关闭底层数据库连接。
+     */
+    @Override
+    public void close() {
+        try {
+<span class="pc bpc" id="L311" title="2 of 4 branches missed.">            if (conn != null &amp;&amp; !conn.isClosed()) {</span>
+<span class="fc" id="L312">                conn.close();</span>
+            }
+<span class="nc" id="L314">        } catch (SQLException e) {</span>
+<span class="nc" id="L315">            throw new RuntimeException(&quot;关闭 UDBX 数据源失败&quot;, e);</span>
+<span class="fc" id="L316">        }</span>
+<span class="fc" id="L317">    }</span>
+
+    // -----------------------------------------------------------------------
+    // 私有辅助方法
+    // -----------------------------------------------------------------------
+
+    /**
+     * 根据 DatasetInfo 中的 DatasetType 创建具体数据集实例。
+     */
+    private Dataset createDataset(DatasetInfo info) {
+<span class="pc bpc" id="L327" title="5 of 9 branches missed.">        return switch (info.datasetType()) {</span>
+<span class="fc" id="L328">            case Tabular -&gt; new TabularDataset(conn, info);</span>
+<span class="fc" id="L329">            case Point -&gt; new PointDataset(conn, info);</span>
+<span class="nc" id="L330">            case PointZ -&gt; new PointZDataset(conn, info);</span>
+<span class="fc" id="L331">            case Line -&gt; new LineDataset(conn, info);</span>
+<span class="nc" id="L332">            case LineZ -&gt; new LineZDataset(conn, info);</span>
+<span class="fc" id="L333">            case Region -&gt; new RegionDataset(conn, info);</span>
+<span class="nc" id="L334">            case RegionZ -&gt; new RegionZDataset(conn, info);</span>
+<span class="nc" id="L335">            case CAD -&gt; new CadDataset(conn, info);</span>
+<span class="nc" id="L336">            default -&gt; throw new IllegalArgumentException(</span>
+<span class="nc" id="L337">                    &quot;暂不支持的数据集类型: &quot; + info.datasetType() + &quot;（数据集: &quot; + info.datasetName() + &quot;）&quot;);</span>
+        };
+    }
+
+    /**
+     * 创建矢量数据集（Point/Line/Region）的公共逻辑：建表 + 注册。
+     *
+     * @param name         数据集名称
+     * @param type         数据集类型
+     * @param srid         坐标系 ID
+     * @param geoTypeName  SQLite 列类型名称（POINT / MULTILINESTRING / MULTIPOLYGON）
+     * @param geometryType geometry_columns.geometry_type 值
+     * @param coordDim     坐标维度（2 或 3）
+     */
+    private Dataset createVectorDataset(String name, DatasetType type, int srid,
+                                         String geoTypeName, int geometryType, int coordDim) {
+<span class="nc" id="L353">        return createVectorDataset(name, type, srid, geoTypeName, geometryType, coordDim,</span>
+<span class="nc" id="L354">                Collections.emptyList());</span>
+    }
+
+    private Dataset createVectorDataset(String name, DatasetType type, int srid,
+                                         String geoTypeName, int geometryType, int coordDim,
+                                         List&lt;FieldInfo&gt; fields) {
+        try {
+            // 1. 建数据表
+<span class="nc" id="L362">            StringBuilder ddl = new StringBuilder(&quot;CREATE TABLE \&quot;&quot;).append(name).append(&quot;\&quot; (&quot;)</span>
+<span class="nc" id="L363">                    .append(&quot;  SmID     INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,&quot;)</span>
+<span class="nc" id="L364">                    .append(&quot;  SmUserID INTEGER DEFAULT 0,&quot;)</span>
+<span class="nc" id="L365">                    .append(&quot;  \&quot;SmGeometry\&quot; &quot;).append(geoTypeName).append(&quot; DEFAULT ''&quot;);</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">            for (FieldInfo f : fields) {</span>
+<span class="nc" id="L367">                ddl.append(&quot;, \&quot;&quot;).append(f.fieldName()).append(&quot;\&quot; &quot;).append(sqlTypeFor(f.fieldType()));</span>
+<span class="nc" id="L368">            }</span>
+<span class="nc" id="L369">            ddl.append(&quot;)&quot;);</span>
+<span class="nc" id="L370">            try (Statement stmt = conn.createStatement()) {</span>
+<span class="nc" id="L371">                stmt.executeUpdate(ddl.toString());</span>
+            }
+            // 2. 注册到 SmRegister
+<span class="nc" id="L374">            int datasetId = registerDao.insert(name, type, srid, &quot;SmID&quot;, &quot;SmGeometry&quot;);</span>
+
+            // 3. 注册到 geometry_columns（f_table_name 必须小写）
+<span class="nc" id="L377">            try (var stmt = conn.prepareStatement(</span>
+                    &quot;INSERT INTO geometry_columns &quot; +
+                    &quot;(f_table_name, f_geometry_column, geometry_type, coord_dimension, srid, spatial_index_enabled) &quot; +
+                    &quot;VALUES (?, 'smgeometry', ?, ?, ?, 0)&quot;)) {
+<span class="nc" id="L381">                stmt.setString(1, name.toLowerCase());</span>
+<span class="nc" id="L382">                stmt.setInt(2, geometryType);</span>
+<span class="nc" id="L383">                stmt.setInt(3, coordDim);</span>
+<span class="nc" id="L384">                stmt.setInt(4, srid);</span>
+<span class="nc" id="L385">                stmt.executeUpdate();</span>
+            }
+
+            // 4. 注册字段元信息（如有）
+<span class="nc bnc" id="L389" title="All 2 branches missed.">            if (!fields.isEmpty()) {</span>
+<span class="nc" id="L390">                new SmFieldInfoDao(conn).insertAll(datasetId, fields);</span>
+            }
+
+<span class="nc" id="L393">            DatasetInfo info = new DatasetInfo(datasetId, name, type, 0, srid);</span>
+<span class="nc" id="L394">            return createDataset(info);</span>
+<span class="nc" id="L395">        } catch (SQLException e) {</span>
+<span class="nc" id="L396">            throw new RuntimeException(&quot;创建矢量数据集 [&quot; + name + &quot;] 失败&quot;, e);</span>
+        }
+    }
+
+    /**
+     * 将 SuperMap FieldType 映射为 SQLite 列类型名称。
+     */
+    private static String sqlTypeFor(FieldType type) {
+<span class="nc bnc" id="L404" title="All 4 branches missed.">        return switch (type) {</span>
+<span class="nc" id="L405">            case Boolean, Byte, Int16, Int32, Int64 -&gt; &quot;INTEGER&quot;;</span>
+<span class="nc" id="L406">            case Single, Double -&gt; &quot;REAL&quot;;</span>
+<span class="nc" id="L407">            case Binary, Geometry -&gt; &quot;BLOB&quot;;</span>
+<span class="nc" id="L408">            default -&gt; &quot;TEXT&quot;;  // Char, NText, Text, Date, Time</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
