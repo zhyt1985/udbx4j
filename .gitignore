@@ -18,6 +18,9 @@ target/
 .DS_Store
 Thumbs.db
 
+# SuperMap iObjects Java Javadoc (offline documentation)
+SuperMap iObjects Java Javadoc/
+
 # Large UDBX data files (keep only sample data in src/test/resources)
 *.udbx
 !src/test/resources/*.udbx
@@ -31,4 +34,7 @@ Thumbs.db
 *~
 
 # Claude
-.claude/scheduled_tasks.lock
+.claude/
+
+# Playwright MCP
+.playwright-mcp/
