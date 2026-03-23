@@ -1,0 +1,34 @@
+# Compiled class files
+*.class
+
+# Maven target directory
+target/
+
+# IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+.settings/
+.project
+.classpath
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Large UDBX data files (keep only sample data in src/test/resources)
+*.udbx
+!src/test/resources/*.udbx
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# Claude
+.claude/scheduled_tasks.lock
