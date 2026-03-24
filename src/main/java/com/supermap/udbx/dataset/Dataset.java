@@ -2,6 +2,7 @@ package com.supermap.udbx.dataset;
 
 import com.supermap.udbx.core.DatasetInfo;
 import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.streaming.AutoCloseableStream;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -92,5 +93,26 @@ public abstract class Dataset implements AutoCloseable {
         } catch (SQLException e) {
             return false;
         }
+    }
+
+    /**
+     * 流式读取数据集要素。
+     *
+     * <p>返回一个可自动关闭的 Stream，避免一次性加载所有数据到内存。
+     * 使用 try-with-resources 确保资源释放：
+     * <pre>{@code
+     * try (var stream = dataset.streamFeatures()) {
+     *     stream.getStream().forEach(feature -> process(feature));
+     * }
+     * }</pre>
+     *
+     * <p>默认实现抛出 UnsupportedOperationException，子类可覆盖以支持流式读取。
+     *
+     * @return 包装了 Stream 和资源的 AutoCloseableStream
+     * @throws UnsupportedOperationException 若子类未实现此方法
+     */
+    public AutoCloseableStream<?> streamFeatures() {
+        throw new UnsupportedOperationException(
+            "streamFeatures() 不支持 " + getType() + " 类型数据集");
     }
 }
