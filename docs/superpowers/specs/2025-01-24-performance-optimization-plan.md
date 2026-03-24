@@ -1,10 +1,12 @@
 # udbx4j 性能优化研发计划
 
-**版本**: 1.1
+**版本**: 1.2
 **日期**: 2025-01-24
-**状态**: Draft | Revised
+**状态**: Draft | Revised | Ready for Implementation
 **负责人**: udbx4j 开发团队
-**修订记录**: v1.0 → v1.1 根据代码审查意见修订
+**修订记录**：
+- v1.0 → v1.1: 根据代码审查意见修订
+- v1.1 → v1.2: 修复二次审查发现的所有 P0/P1 问题
 
 ---
 
@@ -78,32 +80,47 @@
 @Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(3)
-@State(Scope.Thread)
 public class BaselineBenchmark {
 
-    private UdbxDataSource dataSource;
-    private PointDataset dataset;
+    @State(Scope.Thread)
+    public static class ByteBufferState {
+        byte[] bytes;
 
-    @Setup
-    public void setup() throws Exception {
-        Path testFile = createTestDataset(10_000);
-        dataSource = UdbxDataSource.open(testFile.toString());
-        dataset = (PointDataset) dataSource.getDataset("points");
+        @Setup
+        public void setup() {
+            Point point = GEOM_FACTORY.createPoint(new Coordinate(116.404, 39.915));
+            bytes = GaiaGeometryWriter.writePoint(point, 4326);
+        }
+    }
+
+    @State(Scope.Thread)
+    public static class DataSetState {
+        UdbxDataSource dataSource;
+        PointDataset dataset;
+
+        @Setup(Level.Trial)
+        public void setup() throws Exception {
+            Path testFile = createTestDataset(10_000);
+            dataSource = UdbxDataSource.open(testFile.toString());
+            dataset = (PointDataset) dataSource.getDataset("points");
+        }
+
+        @TearDown(Level.Trial)
+        public void tearDown() throws Exception {
+            if (dataSource != null) {
+                dataSource.close();
+            }
+        }
     }
 
     @Benchmark
-    public List<PointFeature> baselineRead10KPoints() {
-        return dataset.getFeatures();
+    public List<PointFeature> baselineRead10KPoints(DataSetState state) {
+        return state.dataset.getFeatures();
     }
 
     @Benchmark
     public Point baselineDecodeGeometry(ByteBufferState state) {
         return GaiaGeometryReader.readPoint(state.bytes);
-    }
-
-    @TearDown
-    public void tearDown() throws Exception {
-        dataSource.close();
     }
 }
 ```
@@ -230,7 +247,39 @@ public class GeometryFactoryPool {
 }
 ```
 
-**2. 重构 GaiaGeometryReader/Writer**
+**2. 补充优化措施**
+
+为达到 15-25% 性能提升，除 GeometryFactory 复用外，还需：
+
+```java
+// a) 预分配 ArrayList 容量（避免扩容）
+public List<PointFeature> getFeatures() {
+    int estimatedCount = info.objectCount();
+    if (estimatedCount > 0) {
+        features = new ArrayList<>(estimatedCount);
+    } else {
+        // 回退到默认容量或从COUNT(*)查询
+        features = new ArrayList<>(Math.min(1024, estimateCountFromDB()));
+    }
+}
+
+// b) 重用 ByteBuffer（减少内存分配）
+// ⚠️ 注意：DirectByteBuffer由GC管理，但在高并发场景可能导致内存泄漏
+// 建议：生产环境使用弱引用或限制池大小
+private static final ThreadLocal<ByteBuffer> BUFFER_POOL =
+    ThreadLocal.withInitial(() -> ByteBuffer.allocateDirect(8192)
+        .order(ByteOrder.LITTLE_ENDIAN));
+
+// c) 批量预取 SmRegister（减少系统表查询）
+// ⚠️ 当前实现：应用生命周期缓存
+// TODO: 未来支持按需失效（如检测到数据集修改时间变化）
+public class SmRegisterCache {
+    private static final Map<String, DatasetInfo> CACHE =
+        new ConcurrentHashMap<>();
+}
+```
+
+**3. 重构 GaiaGeometryReader/Writer**
 
 ```java
 // 修改前：每次创建新实例
@@ -266,11 +315,13 @@ public class GeometryDecodeBenchmark {
 
 #### 预期收益
 
-| 指标 | 当前 | 目标 | 提升 |
-|------|------|------|------|
+| 指标 | 基线（预估） | 阶段1目标 | 提升 |
+|------|-------------|-----------|------|
 | 对象分配 | 100% | 20-30% | ↓ 70-80% |
 | GC 时间 | 基线 | -60% | ↓ 60% |
-| 读取 10K 要素 | ~200ms | <140ms | ↑ 30-50% |
+| 读取 10K 要素 | ~200ms | <170ms | ↑ 15-25% |
+
+**注**：实际目标值取决于第0周基线测试结果
 
 #### 交付物
 
@@ -598,12 +649,14 @@ public void addFeaturesBatch(List<PointFeature> features) {
 ```java
 @Test
 @DisplayName("并发测试：10 线程并发读取应 > 3 倍性能提升")
-void concurrentReadTest() throws InterruptedException {
-    Path testFile = createTestDataset(10_000);
+void concurrentReadTest(@TempDir Path tempDir) throws InterruptedException {
+    Path testFile = createTestDataset(tempDir, 10_000);
     int threadCount = 10;
 
+    // 单线程基线
     long singleThreadStart = System.nanoTime();
     try (UdbxDataSource ds = UdbxDataSource.open(testFile.toString())) {
+        PointDataset dataset = (PointDataset) ds.getDataset("points");
         dataset.getFeatures();
     }
     long singleThreadDuration = System.nanoTime() - singleThreadStart;
@@ -616,7 +669,10 @@ void concurrentReadTest() throws InterruptedException {
     for (int i = 0; i < threadCount; i++) {
         executor.submit(() -> {
             try (UdbxDataSource ds = UdbxDataSource.open(testFile.toString())) {
+                PointDataset dataset = (PointDataset) ds.getDataset("points");
                 dataset.getFeatures();
+            } catch (Exception e) {
+                // log error
             } finally {
                 latch.countDown();
             }
@@ -625,7 +681,9 @@ void concurrentReadTest() throws InterruptedException {
 
     latch.await();
     long multiThreadDuration = System.nanoTime() - multiThreadStart;
+
     executor.shutdown();
+    executor.awaitTermination(5, TimeUnit.SECONDS); // ✅ 等待任务完成
 
     // 验证：多线程应该更快（连接池）
     double speedup = (double) singleThreadDuration / multiThreadDuration * threadCount;
@@ -703,13 +761,16 @@ public class BatchWriteBenchmark {
 
 ### 3.2 性能目标矩阵
 
-| 指标 | 基线 | 阶段1 | 阶段2 | 阶段3 | vs iObjects Java |
-|------|------|-------|-------|-------|------------------|
-| 读 10K 要素 | ~200ms | <140ms | <100ms | <100ms | **2x** |
-| 读 100K 要素 | ~2s | <1.5s | <500ms | <500ms | **3x** |
-| 内存（100K） | ~500MB | <400MB | <100MB | <100MB | **50%** |
-| 批量写 1K | ~100ms | <80ms | <80ms | <20ms | **5x** |
+| 指标 | 基线（预估） | 阶段1 | 阶段2 | 阶段3 | vs iObjects Java |
+|------|-------------|-------|-------|-------|------------------|
+| 读 10K 要素 | ~200ms | <170ms | <120ms | <100ms | **2x** |
+| 读 100K 要素 | ~2s | <1.7s | <500ms | <500ms | **3x** |
+| 内存-流式（100K） | N/A | N/A | <100MB | <100MB | **支持无限** |
+| 内存-全量（100K） | ~500MB | <400MB | <300MB | <300MB | **50%** |
+| 批量写 1K | ~100ms | <85ms | <85ms | <20ms | **5x** |
 | 并发 10 线程 | 1x | 1.5x | 1.5x | 3-5x | **5x** |
+
+**注**：基线值为预估，实际目标根据第0周测试结果调整
 
 ### 3.3 CI/CD 集成
 
@@ -951,6 +1012,19 @@ public class PerformanceMetrics {
         this.enabled = registry != null;
     }
 
+    // 全局单例（可选启用）
+    private static final PerformanceMetrics GLOBAL =
+        new PerformanceMetrics(Metrics.globalRegistry);
+
+    public static PerformanceMetrics global() {
+        return GLOBAL;
+    }
+
+    // 检查是否启用
+    public boolean isEnabled() {
+        return enabled;
+    }
+
     public void recordReadTime(String dataset, long durationMs) {
         if (!enabled) return;
         registry.timer("udbx.read.time",
@@ -982,6 +1056,36 @@ public class PerformanceMetrics {
     }
 }
 ```
+
+### 8.2 可选依赖配置
+
+```xml
+<!-- pom.xml（可选依赖，scope=provided） -->
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-core</artifactId>
+    <version>1.12.0</version>
+    <scope>provided</scope>
+    <optional>true</optional>
+</dependency>
+```
+
+### 8.3 配置开关
+
+```java
+// 配置示例（通过系统属性或环境变量）
+boolean metricsEnabled = Boolean.parseBoolean(
+    System.getProperty("udbx.metrics.enabled", "false")
+);
+
+String exportType = System.getProperty("udbx.metrics.export", "none");
+// 可选值：none, prometheus, jmx, logback
+```
+
+**说明**：
+- 默认关闭性能监控（零开销）
+- 需要时通过系统属性启用
+- 使用 `provided` scope，不增加运行时依赖
 
 ### 8.2 集成 Micrometer
 
