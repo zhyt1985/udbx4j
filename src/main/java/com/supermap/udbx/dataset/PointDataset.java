@@ -3,6 +3,8 @@ package com.supermap.udbx.dataset;
 import com.supermap.udbx.core.DatasetInfo;
 import com.supermap.udbx.geometry.gaia.GaiaGeometryReader;
 import com.supermap.udbx.geometry.gaia.GaiaGeometryWriter;
+import com.supermap.udbx.streaming.AutoCloseableStream;
+import com.supermap.udbx.streaming.FeatureSpliterator;
 import com.supermap.udbx.system.SmRegisterDao;
 import org.locationtech.jts.geom.Point;
 
@@ -15,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.StreamSupport;
 
 /**
  * 点数据集实现（DatasetType=Point，geoType=1）。
@@ -84,6 +87,51 @@ public class PointDataset extends VectorDataset {
             }
         } catch (SQLException e) {
             throw new RuntimeException("读取点要素 SmID=" + smId + " 失败", e);
+        }
+    }
+
+    /**
+     * 流式读取点数据集的所有要素。
+     *
+     * <p>返回一个可自动关闭的 Stream，避免一次性加载所有数据到内存。
+     * 使用 try-with-resources 确保资源释放：
+     * <pre>{@code
+     * try (var stream = pointDataset.streamFeatures()) {
+     *     stream.getStream().forEach(feature -> process(feature));
+     * }
+     * }</pre>
+     *
+     * @return 包装了 Stream 和资源的 AutoCloseableStream
+     * @throws RuntimeException 若创建流失败
+     */
+    @Override
+    public AutoCloseableStream<PointFeature> streamFeatures() {
+        if (!tableExists()) {
+            // 表不存在时返回空 Stream
+            return new AutoCloseableStream<>(java.util.stream.Stream.empty(), () -> {});
+        }
+
+        FeatureSpliterator<PointFeature> spliterator;
+        try {
+            spliterator = new FeatureSpliterator<>(
+                conn,
+                info,
+                getTableName(),
+                this::mapRowForStream
+            );
+        } catch (SQLException e) {
+            throw new RuntimeException("创建 FeatureSpliterator 失败: " + e.getMessage(), e);
+        }
+
+        try {
+            return new AutoCloseableStream<>(
+                StreamSupport.stream(spliterator, false),
+                spliterator
+            );
+        } catch (Exception e) {
+            // 创建 Stream 失败时，确保关闭 spliterator
+            spliterator.close();
+            throw new RuntimeException("创建流式读取失败: " + e.getMessage(), e);
         }
     }
 
@@ -231,6 +279,34 @@ public class PointDataset extends VectorDataset {
     // -----------------------------------------------------------------------
     // 私有辅助方法
     // -----------------------------------------------------------------------
+
+    /**
+     * 将当前行映射为 PointFeature（用于流式读取）。
+     *
+     * <p>每次读取时动态解析用户字段，避免在 Spliterator 构造时执行元数据查询。
+     *
+     * @param rs ResultSet（已定位到目标行）
+     * @return PointFeature 对象
+     * @throws SQLException 若读取失败
+     */
+    private PointFeature mapRowForStream(ResultSet rs) throws SQLException {
+        int smId = rs.getInt("SmID");
+        byte[] geomBytes = rs.getBytes(GEOMETRY_COLUMN);
+        Point geometry = GaiaGeometryReader.readPoint(geomBytes);
+
+        // 动态解析用户字段
+        ResultSetMetaData meta = rs.getMetaData();
+        Map<String, Object> attributes = new HashMap<>();
+        int columnCount = meta.getColumnCount();
+        for (int i = 1; i <= columnCount; i++) {
+            String columnName = meta.getColumnName(i);
+            if (!columnName.startsWith(SYSTEM_COLUMN_PREFIX)) {
+                attributes.put(columnName, rs.getObject(i));
+            }
+        }
+
+        return new PointFeature(smId, geometry, attributes);
+    }
 
     /**
      * 从 ResultSetMetaData 中提取用户字段列名（排除系统字段）。
