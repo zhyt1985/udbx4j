@@ -91,6 +91,50 @@ public class PointDataset extends VectorDataset {
     }
 
     /**
+     * 分页查询点要素。
+     *
+     * @param offset 起始位置（从 0 开始）
+     * @param limit  每页数量
+     * @return 要素列表（按 SmID 升序）
+     * @throws RuntimeException 若数据库查询失败
+     */
+    public List<PointFeature> getFeatures(int offset, int limit) {
+        String sql = "SELECT * FROM \"" + getTableName() + "\" ORDER BY SmID LIMIT ? OFFSET ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, limit);
+            stmt.setInt(2, offset);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                List<PointFeature> features = new ArrayList<>(limit);
+                List<String> userColumns = resolveUserColumns(rs.getMetaData());
+                while (rs.next()) {
+                    features.add(mapRow(rs, userColumns));
+                }
+                return features;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("分页查询失败", e);
+        }
+    }
+
+    /**
+     * 查询数据集中的要素总数。
+     *
+     * @return 要素数量
+     * @throws RuntimeException 若数据库查询失败
+     */
+    public int getCount() {
+        String sql = "SELECT COUNT(*) FROM \"" + getTableName() + "\"";
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            return rs.next() ? rs.getInt(1) : 0;
+        } catch (SQLException e) {
+            throw new RuntimeException("查询要素数量失败", e);
+        }
+    }
+
+    /**
      * 流式读取点数据集的所有要素。
      *
      * <p>返回一个可自动关闭的 Stream，避免一次性加载所有数据到内存。
