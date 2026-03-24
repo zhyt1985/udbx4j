@@ -185,6 +185,56 @@ public class PointDataset extends VectorDataset {
     // -----------------------------------------------------------------------
 
     /**
+     * 批量写入点要素（高性能）。
+     *
+     * <p>使用 JDBC Batch API 在单个事务中写入多个要素，显著提升批量写入性能。
+     * 自动更新 SmRegister 中的 SmObjectCount 和 SmMaxGeometrySize（仅一次）。
+     *
+     * @param features 点要素列表
+     * @throws RuntimeException 若批量写入失败
+     */
+    public void addFeaturesBatch(List<PointFeature> features) {
+        if (features.isEmpty()) {
+            return;
+        }
+
+        String sql = "INSERT INTO \"" + getTableName() +
+                "\" (SmID, SmUserID, \"SmGeometry\") VALUES (?, 0, ?)";
+
+        try {
+            conn.setAutoCommit(false);
+
+            int maxGeomSize = 0;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                for (PointFeature f : features) {
+                    ps.setInt(1, f.smId());
+                    byte[] geomBytes = GaiaGeometryWriter.writePoint(f.geometry(), info.srid());
+                    ps.setBytes(2, geomBytes);
+                    ps.addBatch();
+
+                    // 跟踪最大几何尺寸
+                    if (geomBytes.length > maxGeomSize) {
+                        maxGeomSize = geomBytes.length;
+                    }
+                }
+
+                ps.executeBatch();
+            }
+
+            // 更新 SmRegister（仅一次）
+            new SmRegisterDao(conn).incrementObjectCountBatch(
+                info.datasetId(), features.size(), maxGeomSize);
+
+            conn.commit();
+        } catch (SQLException e) {
+            try { conn.rollback(); } catch (SQLException ignored) {}
+            throw new RuntimeException("批量写入失败", e);
+        } finally {
+            try { conn.setAutoCommit(true); } catch (SQLException ignored) {}
+        }
+    }
+
+    /**
      * 向数据集中写入一个点要素。
      *
      * <p>自动更新 SmRegister 中的 SmObjectCount 和 SmMaxGeometrySize。

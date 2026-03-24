@@ -88,26 +88,21 @@ public class UdbxDataSourcePool implements AutoCloseable {
      */
     public Dataset getDataset(String name) {
         return execute(conn -> {
-            try (Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery(
-                     "SELECT DatasetType FROM SmRegister WHERE DatasetName = '" + name + "'")) {
-                if (!rs.next()) {
-                    throw new IllegalArgumentException("数据集不存在: " + name);
-                }
-                int datasetType = rs.getInt("DatasetType");
-
+            try {
                 SmRegisterDao dao = new SmRegisterDao(conn);
                 DatasetInfo info = dao.findByName(name)
                     .orElseThrow(() -> new IllegalArgumentException("数据集不存在: " + name));
 
                 return switch (info.datasetType()) {
-                    case POINT -> new PointDataset(conn, info);
-                    case LINE -> new LineDataset(conn, info);
-                    case REGION -> new RegionDataset(conn, info);
-                    case TABULAR -> new TabularDataset(conn, info);
+                    case Point -> new PointDataset(conn, info);
+                    case Line -> new LineDataset(conn, info);
+                    case Region -> new RegionDataset(conn, info);
+                    case Tabular -> new TabularDataset(conn, info);
                     default -> throw new UnsupportedOperationException(
                         "不支持的数据集类型: " + info.datasetType());
                 };
+            } catch (SQLException e) {
+                throw new RuntimeException("获取数据集失败: " + name, e);
             }
         });
     }
@@ -119,15 +114,19 @@ public class UdbxDataSourcePool implements AutoCloseable {
      */
     private void checkWALEnabled() {
         execute(conn -> {
-            try (Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery("PRAGMA journal_mode")) {
-                if (rs.next()) {
-                    String mode = rs.getString(1);
-                    if (!"wal".equalsIgnoreCase(mode)) {
-                        System.err.println(
-                            "警告: WAL 模式未启用，并发性能受限。当前模式: " + mode);
+            try {
+                try (Statement stmt = conn.createStatement();
+                     ResultSet rs = stmt.executeQuery("PRAGMA journal_mode")) {
+                    if (rs.next()) {
+                        String mode = rs.getString(1);
+                        if (!"wal".equalsIgnoreCase(mode)) {
+                            System.err.println(
+                                "警告: WAL 模式未启用，并发性能受限。当前模式: " + mode);
+                        }
                     }
                 }
+            } catch (SQLException e) {
+                throw new RuntimeException("检查 WAL 模式失败", e);
             }
             return null;
         });

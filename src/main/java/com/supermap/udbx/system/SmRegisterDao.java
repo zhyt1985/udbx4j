@@ -179,6 +179,28 @@ public class SmRegisterDao {
         }
     }
 
+    /**
+     * 批量递增 SmObjectCount 并更新最大几何尺寸。
+     *
+     * @param datasetId    数据集 ID
+     * @param count        递增数量
+     * @param maxBlobSize  最大几何 BLOB 字节数
+     * @throws SQLException 操作失败时抛出
+     */
+    public void incrementObjectCountBatch(int datasetId, int count, int maxBlobSize) throws SQLException {
+        String sql = "UPDATE SmRegister " +
+                "SET SmObjectCount = SmObjectCount + ?, " +
+                "    SmMaxGeometrySize = CASE WHEN SmMaxGeometrySize < ? THEN ? ELSE SmMaxGeometrySize END " +
+                "WHERE SmDatasetID = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, count);
+            stmt.setInt(2, maxBlobSize);
+            stmt.setInt(3, maxBlobSize);
+            stmt.setInt(4, datasetId);
+            stmt.executeUpdate();
+        }
+    }
+
     private int nextDatasetId() throws SQLException {
         String sql = "SELECT COALESCE(MAX(SmDatasetID), 0) + 1 FROM SmRegister";
         try (PreparedStatement stmt = conn.prepareStatement(sql);
