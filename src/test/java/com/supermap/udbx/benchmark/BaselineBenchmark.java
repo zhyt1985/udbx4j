@@ -43,7 +43,9 @@ public class BaselineBenchmark {
 
         @Setup(Level.Trial)
         public void setup() throws Exception {
-            testFile = Files.createTempFile("baseline-", ".udbx");
+            // 使用 UUID 生成唯一文件名，但不创建文件
+            String fileName = "baseline-" + java.util.UUID.randomUUID() + ".udbx";
+            testFile = java.nio.file.Files.createTempDirectory("udbx-bench-").resolve(fileName);
             createTestDataset(testFile, 10_000);
             dataSource = UdbxDataSource.open(testFile.toString());
             dataset = (PointDataset) dataSource.getDataset("points");

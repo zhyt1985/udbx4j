@@ -1,0 +1,24 @@
+{
+  "date": "2026-03-24",
+  "jdkVersion": "17.0.11",
+  "jmhVersion": "1.37",
+  "results": {
+    "baselineRead10KPoints": {
+      "score": "4.516 ms",
+      "scoreError": "0.153 ms",
+      "description": "读取 10,000 个点要素的平均时间",
+      "throughput": "2,214,953 要素/秒"
+    },
+    "baselineDecodeGeometry": {
+      "score": "0.00000936 ms",
+      "scoreError": "0.00000008 ms",
+      "description": "解码单个点几何对象的平均时间",
+      "throughput": "106,837,606 几何对象/秒"
+    }
+  },
+  "environment": {
+    "os": "macOS Darwin 24.6.0",
+    "vm": "OpenJDK 64-Bit Server VM 17.0.11+9-LTS",
+    "hardware": "Apple Silicon"
+  }
+}
