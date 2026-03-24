@@ -34,21 +34,14 @@ public class StreamingReadBenchmark {
         testFile = Files.createTempFile("streaming-", ".udbx");
         try (UdbxDataSource ds = UdbxDataSource.create(testFile.toString())) {
             PointDataset pd = ds.createPointDataset("points", SRID);
-            // 创建 10 万个测试点（批量写入，使用事务）
-            pd.getConnection().setAutoCommit(false);
+            // 创建 10 万个测试点
             for (int i = 0; i < TEST_POINT_COUNT; i++) {
                 Point point = GEOMETRY_FACTORY.createPoint(new Coordinate(
                     116.0 + (i % 1000) * 0.001,
                     39.0 + (i / 1000) * 0.001
                 ));
                 pd.addFeature(i + 1, point, null);
-                // 每 1000 条提交一次
-                if ((i + 1) % 1000 == 0) {
-                    pd.getConnection().commit();
-                }
             }
-            pd.getConnection().commit();
-            pd.getConnection().setAutoCommit(true);
         }
     }
 
