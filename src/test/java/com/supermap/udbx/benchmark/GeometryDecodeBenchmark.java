@@ -50,17 +50,20 @@ public class GeometryDecodeBenchmark {
             Point pointZ = GEOM_FACTORY.createPoint(new Coordinate(116.404, 39.915, 50.0));
             pointZBytes = com.supermap.udbx.geometry.gaia.GaiaGeometryWriter.writePointZ(pointZ, 4326);
 
-            // LineString
+            // LineString (as single-part MultiLineString)
             Coordinate[] lineCoords = new Coordinate[]{
                 new Coordinate(116.404, 39.915),
                 new Coordinate(116.414, 39.925),
                 new Coordinate(116.424, 39.935)
             };
             LineString lineString = GEOM_FACTORY.createLineString(lineCoords);
-            lineStringBytes = com.supermap.udbx.geometry.gaia.GaiaGeometryWriter.writeLineString(lineString, 4326);
+            LineString[] lineStrings = new LineString[]{lineString};
+            org.locationtech.jts.geom.MultiLineString multiLineString =
+                GEOM_FACTORY.createMultiLineString(lineStrings);
+            lineStringBytes = com.supermap.udbx.geometry.gaia.GaiaGeometryWriter.writeMultiLineString(multiLineString, 4326);
 
-            // MultiLineString
-            LineString[] lineStrings = new LineString[]{
+            // MultiLineString (2 parts)
+            LineString[] lineStrings2 = new LineString[]{
                 GEOM_FACTORY.createLineString(new Coordinate[]{
                     new Coordinate(116.404, 39.915),
                     new Coordinate(116.414, 39.925)
@@ -70,11 +73,11 @@ public class GeometryDecodeBenchmark {
                     new Coordinate(116.434, 39.945)
                 })
             };
-            org.locationtech.jts.geom.MultiLineString multiLineString =
-                GEOM_FACTORY.createMultiLineString(lineStrings);
-            multiLineStringBytes = com.supermap.udbx.geometry.gaia.GaiaGeometryWriter.writeMultiLineString(multiLineString, 4326);
+            org.locationtech.jts.geom.MultiLineString multiLineString2 =
+                GEOM_FACTORY.createMultiLineString(lineStrings2);
+            multiLineStringBytes = com.supermap.udbx.geometry.gaia.GaiaGeometryWriter.writeMultiLineString(multiLineString2, 4326);
 
-            // Polygon
+            // Polygon (as single-part MultiPolygon)
             Coordinate[] coords = new Coordinate[]{
                 new Coordinate(116.404, 39.915),
                 new Coordinate(116.424, 39.915),
@@ -83,10 +86,13 @@ public class GeometryDecodeBenchmark {
                 new Coordinate(116.404, 39.915)
             };
             Polygon polygon = GEOM_FACTORY.createPolygon(coords);
-            polygonBytes = com.supermap.udbx.geometry.gaia.GaiaGeometryWriter.writePolygon(polygon, 4326);
+            Polygon[] polygons = new Polygon[]{polygon};
+            org.locationtech.jts.geom.MultiPolygon multiPolygon =
+                GEOM_FACTORY.createMultiPolygon(polygons);
+            polygonBytes = com.supermap.udbx.geometry.gaia.GaiaGeometryWriter.writeMultiPolygon(multiPolygon, 4326);
 
-            // MultiPolygon
-            Polygon[] polygons = new Polygon[]{
+            // MultiPolygon (2 parts)
+            Polygon[] polygons2 = new Polygon[]{
                 GEOM_FACTORY.createPolygon(new Coordinate[]{
                     new Coordinate(116.404, 39.915),
                     new Coordinate(116.414, 39.915),
@@ -102,8 +108,9 @@ public class GeometryDecodeBenchmark {
                     new Coordinate(116.424, 39.935)
                 })
             };
-            org.locationtech.jts.geom.MultiPolygon multiPolygon = GEOM_FACTORY.createMultiPolygon(polygons);
-            multiPolygonBytes = com.supermap.udbx.geometry.gaia.GaiaGeometryWriter.writeMultiPolygon(multiPolygon, 4326);
+            org.locationtech.jts.geom.MultiPolygon multiPolygon2 =
+                GEOM_FACTORY.createMultiPolygon(polygons2);
+            multiPolygonBytes = com.supermap.udbx.geometry.gaia.GaiaGeometryWriter.writeMultiPolygon(multiPolygon2, 4326);
         }
     }
 
@@ -118,8 +125,8 @@ public class GeometryDecodeBenchmark {
     }
 
     @Benchmark
-    public LineString decodeLineString(ByteBufferState state) {
-        return com.supermap.udbx.geometry.gaia.GaiaGeometryReader.readLineString(state.lineStringBytes);
+    public org.locationtech.jts.geom.MultiLineString decodeLineString(ByteBufferState state) {
+        return com.supermap.udbx.geometry.gaia.GaiaGeometryReader.readMultiLineString(state.lineStringBytes);
     }
 
     @Benchmark
@@ -128,8 +135,8 @@ public class GeometryDecodeBenchmark {
     }
 
     @Benchmark
-    public Polygon decodePolygon(ByteBufferState state) {
-        return com.supermap.udbx.geometry.gaia.GaiaGeometryReader.readPolygon(state.polygonBytes);
+    public org.locationtech.jts.geom.MultiPolygon decodePolygon(ByteBufferState state) {
+        return com.supermap.udbx.geometry.gaia.GaiaGeometryReader.readMultiPolygonAuto(state.polygonBytes);
     }
 
     @Benchmark
