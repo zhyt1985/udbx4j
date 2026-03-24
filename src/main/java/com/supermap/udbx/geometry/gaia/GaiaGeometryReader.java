@@ -8,7 +8,8 @@ import org.locationtech.jts.geom.MultiLineString;
 import org.locationtech.jts.geom.MultiPolygon;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
-import org.locationtech.jts.geom.PrecisionModel;
+
+import com.supermap.udbx.geometry.GeometryFactoryPool;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -72,7 +73,7 @@ public final class GaiaGeometryReader {
 
         validateGaiaEnd(buf);
 
-        GeometryFactory factory = new GeometryFactory(new PrecisionModel(), srid);
+        GeometryFactory factory = GeometryFactoryPool.getFactory(srid);
         return factory.createPoint(new Coordinate(x, y));
     }
 
@@ -98,7 +99,7 @@ public final class GaiaGeometryReader {
 
         validateGaiaEnd(buf);
 
-        GeometryFactory factory = new GeometryFactory(new PrecisionModel(), srid);
+        GeometryFactory factory = GeometryFactoryPool.getFactory(srid);
         return factory.createPoint(new Coordinate(x, y, z));
     }
 
@@ -133,7 +134,7 @@ public final class GaiaGeometryReader {
         int numLineStrings = buf.getInt();
         LineString[] lineStrings = new LineString[numLineStrings];
 
-        GeometryFactory factory = new GeometryFactory(new PrecisionModel(), srid);
+        GeometryFactory factory = GeometryFactoryPool.getFactory(srid);
 
         for (int i = 0; i < numLineStrings; i++) {
             // LineStringEntity: gaiaEntityMark(0x69) + geoType(2) + numPoints + coords
@@ -189,7 +190,7 @@ public final class GaiaGeometryReader {
         int numLineStrings = buf.getInt();
         LineString[] lineStrings = new LineString[numLineStrings];
 
-        GeometryFactory factory = new GeometryFactory(new PrecisionModel(), srid);
+        GeometryFactory factory = GeometryFactoryPool.getFactory(srid);
 
         for (int i = 0; i < numLineStrings; i++) {
             // LineStringZEntity: gaiaEntityMark(0x69) + geoType(1002) + numPoints + coords
@@ -306,7 +307,7 @@ public final class GaiaGeometryReader {
         int numPolygons = buf.getInt();
         Polygon[] polygons = new Polygon[numPolygons];
 
-        GeometryFactory factory = new GeometryFactory(new PrecisionModel(), srid);
+        GeometryFactory factory = GeometryFactoryPool.getFactory(srid);
 
         for (int i = 0; i < numPolygons; i++) {
             polygons[i] = readPolygon2D(buf, factory);
@@ -348,7 +349,7 @@ public final class GaiaGeometryReader {
         int numPolygons = buf.getInt();
         Polygon[] polygons = new Polygon[numPolygons];
 
-        GeometryFactory factory = new GeometryFactory(new PrecisionModel(), srid);
+        GeometryFactory factory = GeometryFactoryPool.getFactory(srid);
 
         for (int i = 0; i < numPolygons; i++) {
             polygons[i] = readPolygon3D(buf, factory);
