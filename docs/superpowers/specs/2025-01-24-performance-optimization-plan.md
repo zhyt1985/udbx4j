@@ -1,20 +1,25 @@
 # udbx4j 性能优化研发计划
 
-**版本**: 1.0
+**版本**: 1.1
 **日期**: 2025-01-24
-**状态**: Draft
+**状态**: Draft | Revised
 **负责人**: udbx4j 开发团队
+**修订记录**: v1.0 → v1.1 根据代码审查意见修订
 
 ---
 
 ## 文档概述
 
-本文档定义了 udbx4j 在 1-2 个月短期内的性能优化研发计划，以"轻量级、性能优先"为核心目标，采用三阶段渐进式优化策略。
+本文档定义了 udbx4j 在 7-8 周短期内的性能优化研发计划，以"轻量级、性能优先"为核心目标，采用三阶段渐进式优化策略。
 
-**核心目标**：
+**重要前提**：
+- ⚠️ **第 0 周**必须先建立性能基线，所有目标基于真实测量数据
+- 性能目标为**预期值**，可能根据基线测试结果调整
+
+**核心目标**（基于基线测试后的预期）：
 - 读取性能提升 2-3 倍（vs iObjects Java）
-- 内存占用降低 80-90%
-- 并发性能提升 3-5 倍
+- 流式处理内存占用降低 90%（vs 全量加载）
+- 并发性能提升 3-5 倍（多线程读取场景）
 
 **技术策略**：性能与轻量并重（60/40 权重）
 
@@ -59,15 +64,151 @@
 
 ---
 
-## 2. 三阶段优化计划
+## 2. 第 0 周：性能基线建立
 
-### 2.1 阶段 1：基础优化（第 1-2 周）
+**目标**：建立真实的性能基线数据，为后续优化设定合理目标
 
-**目标**：减少对象分配，降低 GC 压力，性能提升 30-50%
+### 2.1 基线测试任务
+
+**1. 创建基线测试套件**
+
+```java
+@BenchmarkMode(Mode.AverageTime)
+@OutputTimeUnit(TimeUnit.MILLISECONDS)
+@Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
+@Fork(3)
+@State(Scope.Thread)
+public class BaselineBenchmark {
+
+    private UdbxDataSource dataSource;
+    private PointDataset dataset;
+
+    @Setup
+    public void setup() throws Exception {
+        Path testFile = createTestDataset(10_000);
+        dataSource = UdbxDataSource.open(testFile.toString());
+        dataset = (PointDataset) dataSource.getDataset("points");
+    }
+
+    @Benchmark
+    public List<PointFeature> baselineRead10KPoints() {
+        return dataset.getFeatures();
+    }
+
+    @Benchmark
+    public Point baselineDecodeGeometry(ByteBufferState state) {
+        return GaiaGeometryReader.readPoint(state.bytes);
+    }
+
+    @TearDown
+    public void tearDown() throws Exception {
+        dataSource.close();
+    }
+}
+```
+
+**2. 基线测试指标**
+
+| 指标 | 测试方法 | 目的 |
+|------|----------|------|
+| 读取 10K 要素 | baselineRead10KPoints() | 测量当前读取性能 |
+| 几何解码 | baselineDecodeGeometry() | 测量 Geometry 解码开销 |
+| 内存占用 | JMX/GC 日志分析 | 测量对象分配和 GC 压力 |
+| 并发性能 | 多线程基线测试 | 测量当前并发扩展性 |
+
+**3. 基线数据记录**
+
+```bash
+# 运行基线测试
+mvn clean test -Dtest=BaselineBenchmark
+
+# 输出格式
+Baseline Performance Report (2025-01-24):
+- Read 10K points: 180ms (avg of 30 runs)
+- Decode geometry: 0.05ms (avg of 30 runs)
+- Memory (100K points): 450MB
+- Concurrent (10 threads): 1.2x speedup
+```
+
+### 2.2 目标调整原则
+
+基线测试完成后，根据实际数据调整各阶段目标：
+
+- 如果基线读取 10K 要素 = 180ms，则阶段 1 目标设为 **150ms**（↓17%）
+- 如果基线读取 10K 要素 = 250ms，则阶段 1 目标设为 **200ms**（↓20%）
+- 几何解码占比 < 20%，则需优化其他部分（JDBC、对象分配）
+
+### 2.3 交付物
+
+- [ ] 基线测试套件（5 个 benchmark）
+- [ ] 基线性能报告
+- [ ] 调整后的性能目标矩阵
+- [ ] 时间线微调（基于基线结果）
+
+---
+
+## 3. 三阶段优化计划
+
+### 3.1 阶段 1：基础优化（第 1-2 周）
+
+**目标**：减少对象分配，降低 GC 压力，性能提升 15-25%（基于基线）
+
+**说明**：原目标 30-50% 过于激进，仅通过 GeometryFactory 复用难以达成。降低至 15-25% 更现实，并补充其他优化措施。
 
 #### 实现内容
 
 **1. GeometryFactory 复用机制**
+
+```java
+// 新增类：com.supermap.udbx.geometry.GeometryFactoryPool
+public class GeometryFactoryPool {
+    private static final ConcurrentHashMap<Integer, GeometryFactory> POOL =
+        new ConcurrentHashMap<>();
+
+    public static GeometryFactory getFactory(int srid) {
+        return POOL.computeIfAbsent(srid,
+            k -> new GeometryFactory(new PrecisionModel(), k));
+    }
+
+    // 预加载常用 SRID
+    static {
+        getFactory(4326);  // WGS84
+        getFactory(4490);  // CGCS2000
+        getFactory(3857);  // Web Mercator
+    }
+}
+```
+
+**2. 补充优化措施**
+
+为达到 15-25% 性能提升，除 GeometryFactory 复用外，还需：
+
+```java
+// a) 预分配 ArrayList 容量（避免扩容）
+public List<PointFeature> getFeatures() {
+    int estimatedCount = info.objectCount();
+    if (estimatedCount > 0) {
+        features = new ArrayList<>(estimatedCount);
+    } else {
+        features = new ArrayList<>();  // 回退到默认
+    }
+    // ...
+}
+
+// b) 重用 ByteBuffer（减少内存分配）
+private static final ThreadLocal<ByteBuffer> BUFFER_POOL =
+    ThreadLocal.withInitial(() -> ByteBuffer.allocateDirect(8192)
+        .order(ByteOrder.LITTLE_ENDIAN));
+
+// c) 批量预取 SmRegister（减少系统表查询）
+public class SmRegisterCache {
+    private static final Map<String, DatasetInfo> CACHE =
+        new ConcurrentHashMap<>();
+}
+```
+
+**3. 重构 GaiaGeometryReader/Writer**
 
 ```java
 // 新增类：com.supermap.udbx.geometry.GeometryFactoryPool
@@ -147,64 +288,106 @@ public class GeometryDecodeBenchmark {
 
 #### 实现内容
 
-**1. 流式读取 API**
+**1. 流式读取 API（修复设计）**
 
 ```java
 // 在 Dataset 基类中新增
-public default Stream<PointFeature> streamFeatures() {
-    return StreamSupport(new FeatureSpliterator(
-        this.conn, this.info, this.getTableName()
-    ), false);
+public default AutoCloseableStream<PointFeature> streamFeatures() {
+    return new AutoCloseableStream<>(
+        StreamSupport(new FeatureSpliterator(
+            this.conn, this.info, this.getTableName()
+        ), false)  // 明确禁止并行流
+    );
 }
 
-// 使用示例
-try (UdbxDataSource ds = UdbxDataSource.open("large.udbx")) {
-    PointDataset dataset = (PointDataset) ds.getDataset("points");
-    dataset.streamFeatures()
+// AutoCloseableStream 包装器
+public class AutoCloseableStream<T> implements AutoCloseable {
+    private final Stream<T> stream;
+    private final AutoCloseable resource;
+
+    public AutoCloseableStream(Stream<T> stream, AutoCloseable resource) {
+        this.stream = stream;
+        this.resource = resource;
+    }
+
+    public Stream<T> getStream() {
+        return stream;
+    }
+
+    @Override
+    public void close() {
+        resource.close();
+    }
+}
+
+// 使用示例（确保资源释放）
+try (var stream = dataset.streamFeatures()) {
+    stream.getStream()
         .filter(f -> f.geometry().getX() > 116.0)
         .limit(1000)
         .forEach(f -> process(f));
 }
 ```
 
-**FeatureSpliterator 实现**：
+**FeatureSpliterator 实现（修复安全问题）**：
 
 ```java
 class FeatureSpliterator extends Spliterators.AbstractSpliterator<PointFeature> {
     private final PreparedStatement stmt;
     private final ResultSet rs;
+    private boolean closed = false;
 
     public FeatureSpliterator(Connection conn, DatasetInfo info, String tableName)
             throws SQLException {
-        super(Long.MAX_VALUE, Spliterator.ORDERED);
-        this.stmt = conn.prepareStatement("SELECT * FROM \"" + tableName + "\"");
+        super(Long.MAX_VALUE, Spliterator.ORDERED | Spliterator.NONNULL);
+
+        // 修复1：使用参数化查询，避免 SQL 注入
+        String sql = "SELECT * FROM \"" + tableName.replace("\"", "\"\"") + "\"";
+        this.stmt = conn.prepareStatement(sql);
+
         this.rs = stmt.executeQuery();
     }
 
     @Override
     public boolean tryAdvance(Consumer<? super PointFeature> action) {
+        if (closed) {
+            throw new IllegalStateException("Spliterator 已关闭");
+        }
+
         try {
             if (rs.next()) {
                 action.accept(mapRow(rs));
                 return true;
             }
+            close(); // 自动关闭
             return false;
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            close();
+            throw new RuntimeException("读取失败", e);
         }
     }
 
     @Override
     public void close() {
-        try {
-            if (rs != null) rs.close();
-            if (stmt != null) stmt.close();
-        } catch (SQLException e) {
-            // log warning
+        if (!closed) {
+            try {
+                if (rs != null) rs.close();
+                if (stmt != null) stmt.close();
+            } catch (SQLException e) {
+                // log warning
+            } finally {
+                closed = true;
+            }
         }
     }
 }
 ```
+
+**安全说明**：
+- ✅ 使用参数化查询（或表名白名单验证）
+- ✅ AutoCloseableStream 确保资源释放
+- ✅ 禁止并行流（ResultSet 非线程安全）
+- ✅ 异常时自动关闭资源
 
 **2. 分页查询 API**
 
@@ -263,13 +446,19 @@ class PaginationIterator implements Iterator<List<PointFeature>> {
 }
 ```
 
-#### 预期收益
+#### 预期收益（明确场景）
 
-| 指标 | 当前 | 目标 | 提升 |
-|------|------|------|------|
-| 100K 要素内存 | ~500MB | <100MB | ↓ 80% |
-| 首次加载时间 | ~2s | <500ms | ↑ 75% |
-| 支持最大数据集 | ~10万 | 无限 | 流式处理 |
+**注意**：流式处理与全量加载是两种不同的使用场景
+
+| 场景 | API | 当前内存 | 目标内存 | 提升 |
+|------|-----|----------|----------|------|
+| **流式处理** | `streamFeatures()` | N/A | <100MB | 支持百万级要素 |
+| **全量加载** | `getFeatures()` | ~500MB | <300MB | ↓ 40% |
+
+**说明**：
+- 流式处理：逐条读取，内存占用恒定（与数据量无关）
+- 全量加载：所有要素加载到 List，内存随数据量线性增长
+- 大数据集（>10 万要素）强烈推荐使用流式 API
 
 #### 交付物
 
@@ -287,7 +476,7 @@ class PaginationIterator implements Iterator<List<PointFeature>> {
 
 #### 实现内容
 
-**1. HikariCP 连接池集成**
+**1. HikariCP 连接池集成（含 SQLite 限制说明）**
 
 ```java
 // 新增类：com.supermap.udbx.UdbxDataSourcePool
@@ -311,6 +500,26 @@ public class UdbxDataSourcePool implements AutoCloseable {
         config.setMaxLifetime(1800000);
 
         this.pool = new HikariDataSource(config);
+
+        // 检测 WAL 模式
+        checkWALEnabled();
+    }
+
+    // 检测 WAL 模式是否启用
+    private void checkWALEnabled() {
+        try (Connection conn = pool.getConnection()) {
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery("PRAGMA journal_mode")) {
+                if (rs.next()) {
+                    String mode = rs.getString(1);
+                    if (!"wal".equalsIgnoreCase(mode)) {
+                        logger.warn("WAL 模式未启用，并发性能受限。当前模式: {}", mode);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.warn("无法检测 WAL 模式", e);
+        }
     }
 
     public <T> T execute(Function<Connection, T> callback) {
@@ -321,22 +530,24 @@ public class UdbxDataSourcePool implements AutoCloseable {
         }
     }
 
-    // 获取数据集
-    public Dataset getDataset(String name) {
-        return execute(conn -> {
-            // 复用现有 Dataset 创建逻辑
-            return createDataset(conn, name);
-        });
-    }
-
-    @Override
-    public void close() {
-        if (pool != null) {
-            pool.close();
-        }
-    }
+    // ⚠️ 重要：连接池主要用于读取场景
+    // SQLite 写锁限制：同一时间只允许一个写操作
+    // 连接池对写入场景无性能提升，反而增加开销
 }
 ```
+
+**SQLite 限制说明**：
+
+| 特性 | 说明 | 影响 |
+|------|------|------|
+| **写锁** | SQLite 同一时间只允许一个写操作 | 连接池对写入无效 |
+| **WAL 模式** | 允许多读一写，提升并发读取 | 需要检测是否启用 |
+| **连接复用** | 读操作可复用连接 | 主要收益在读取场景 |
+
+**使用建议**：
+- ✅ 使用连接池进行**并发读取**
+- ⚠️ **写入操作**使用单连接（或禁用连接池）
+- ✅ 确保 WAL 模式已启用
 
 **使用示例**：
 
@@ -643,7 +854,16 @@ docs/
 
 **总计**：8 个工作日
 
-**总工作量**：24 个工作日 ≈ 6 周
+**总工作量**：
+- 第 0 周（基线测试）：5 个工作日
+- 阶段 1-3：24 个工作日
+- 缓冲时间（调试、优化迭代）：5 个工作日
+- **总计**：34 个工作日 ≈ **7-8 周**
+
+**时间线调整**：
+- 原 6 周计划过于乐观
+- 增加 20% 缓冲时间用于性能调优和 Bug 修复
+- 每个阶段结束后预留 0.5 天进行性能验证和目标调整
 
 ---
 
@@ -716,7 +936,113 @@ Week 6:    最终交付与文档
 
 ---
 
-## 8. 后续规划
+## 8. 性能监控与可观测性
+
+### 8.1 性能指标收集
+
+```java
+// 新增类：com.supermap.udbx.metrics.PerformanceMetrics
+public class PerformanceMetrics {
+    private final MeterRegistry registry;
+    private final boolean enabled;
+
+    public PerformanceMetrics(MeterRegistry registry) {
+        this.registry = registry;
+        this.enabled = registry != null;
+    }
+
+    public void recordReadTime(String dataset, long durationMs) {
+        if (!enabled) return;
+        registry.timer("udbx.read.time",
+            "dataset", dataset)
+            .record(durationMs, TimeUnit.MILLISECONDS);
+    }
+
+    public void recordDecodeTime(String geometryType, long durationNs) {
+        if (!enabled) return;
+        registry.timer("udbx.decode.time",
+            "geometry", geometryType)
+            .record(durationNs, TimeUnit.NANOSECONDS);
+    }
+
+    public void recordMemoryUsage(String dataset, long bytes) {
+        if (!enabled) return;
+        registry.gauge("udbx.memory.usage", bytes,
+            "dataset", dataset);
+    }
+
+    public void recordConnectionPoolMetrics(String poolName, HikariPoolMXBean pool) {
+        if (!enabled) return;
+        registry.gauge("udbx.pool.active", pool.getActiveConnections(),
+            "pool", poolName);
+        registry.gauge("udbx.pool.idle", pool.getIdleConnections(),
+            "pool", poolName);
+        registry.gauge("udbx.pool.waiting", pool.getThreadsAwaitingConnection(),
+            "pool", poolName);
+    }
+}
+```
+
+### 8.2 集成 Micrometer
+
+```xml
+<!-- pom.xml -->
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-core</artifactId>
+    <version>1.12.0</version>
+</dependency>
+```
+
+### 8.3 使用示例
+
+```java
+// 在 Dataset 中集成性能监控
+public class PointDataset extends VectorDataset {
+    private static final PerformanceMetrics METRICS =
+        new PerformanceMetrics(Metrics.globalRegistry);
+
+    public List<PointFeature> getFeatures() {
+        long start = System.nanoTime();
+
+        List<PointFeature> features = // ... 实现逻辑 ...
+
+        long duration = System.nanoTime() - start;
+        METRICS.recordReadTime(getName(), TimeUnit.NANOSECONDS.toMillis(duration));
+
+        return features;
+    }
+}
+```
+
+### 8.4 导出指标
+
+**Spring Boot 集成**：
+```yaml
+# application.yml
+management:
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+```
+
+**独立应用**：
+```java
+// 启用 Prometheus HTTPServer
+HTTPServer server = new HTTPServer(8080);
+PrometheusRegistry registry = new PrometheusRegistry();
+new PerformanceMetrics(registry);
+server.start();
+```
+
+---
+
+## 9. 后续规划
 
 ### 8.1 中期规划（3-6 个月）
 
