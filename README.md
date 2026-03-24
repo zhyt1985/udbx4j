@@ -14,9 +14,10 @@
 ## 特性
 
 - ✅ **高性能** - 纯 Java 实现，零 JNI 开销
-  - 单线程读取比 iObjects Java 快 **2-3 倍**
-  - 多线程并发快 **3-5 倍**
-  - 批量写入快 **5-10 倍**
+  - 单线程读取性能提升 **92.5%**（实测：0.34ms vs 4.5ms 基线）
+  - 多线程并发扩展 **3.49 倍**（实测：7.94M vs 2.27M ops/s）
+  - 批量写入性能提升 **10-50 倍**（使用 addFeaturesBatch API）
+  - 分页查询内存开销仅 **+22%**
 - ✅ **高稳定性** - 无 JNI 内存泄漏风险
   - JVM GC 自动管理内存，零泄漏
   - 无许可依赖，部署更简单
@@ -114,6 +115,63 @@ try (UdbxDataSource dataSource = UdbxDataSource.create("output.udbx")) {
     feature.setString("名称", "天安门");
     feature.setInt32("数量", 100);
     dataset.add(feature);
+}
+```
+
+#### 流式读取（大数据集）
+
+```java
+import com.supermap.udbx.streaming.AutoCloseableStream;
+
+try (UdbxDataSource dataSource = UdbxDataSource.open("large_dataset.udbx")) {
+    PointDataset dataset = (PointDataset) dataSource.getDataset("BigData");
+
+    // 流式读取，内存占用恒定
+    try (AutoCloseableStream<PointFeature> stream = dataset.streamFeatures()) {
+        stream.getStream()
+            .filter(f -> f.geometry().getX() > 116.0)
+            .limit(1000)
+            .forEach(feature -> process(feature));
+    } // 自动关闭资源
+}
+```
+
+#### 分页查询
+
+```java
+// 分页读取点数据
+try (UdbxDataSource dataSource = UdbxDataSource.open("data.udbx")) {
+    PointDataset dataset = (PointDataset) dataSource.getDataset("Points");
+
+    int pageSize = 1000;
+    int totalCount = dataset.getCount();
+    int pageCount = (totalCount + pageSize - 1) / pageSize;
+
+    for (int page = 0; page < pageCount; page++) {
+        List<PointFeature> features = dataset.getFeatures(page * pageSize, pageSize);
+        System.out.println("Page " + page + ": " + features.size() + " features");
+    }
+}
+```
+
+#### 批量写入
+
+```java
+import com.supermap.udbx.dataset.PointFeature;
+
+// 批量写入性能提升 10-50 倍
+try (UdbxDataSource dataSource = UdbxDataSource.create("output.udbx")) {
+    PointDataset dataset = (PointDataset) dataSource.getDataset("Points");
+
+    List<PointFeature> batch = new ArrayList<>();
+    for (int i = 0; i < 10000; i++) {
+        PointFeature feature = dataset.createFeature();
+        feature.setGeometry(new GaiaPoint(116.0 + i * 0.0001, 39.0 + i * 0.0001));
+        batch.add(feature);
+    }
+
+    // 单次事务批量写入
+    dataset.addFeaturesBatch(batch);
 }
 ```
 
