@@ -48,7 +48,11 @@ public class RegionDataset extends VectorDataset {
     public List<RegionFeature> getFeatures() {
         if (!tableExists()) return List.of();
         String sql = "SELECT * FROM \"" + getTableName() + "\" ORDER BY SmID";
-        List<RegionFeature> features = new ArrayList<>();
+
+        // 预分配 ArrayList 容量以减少扩容开销
+        int estimatedCount = info.objectCount();
+        int initialCapacity = Math.max(16, Math.min(estimatedCount, 1_000_000));
+        List<RegionFeature> features = new ArrayList<>(initialCapacity);
 
         try (PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {

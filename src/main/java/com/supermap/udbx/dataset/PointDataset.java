@@ -45,7 +45,11 @@ public class PointDataset extends VectorDataset {
     public List<PointFeature> getFeatures() {
         if (!tableExists()) return List.of();
         String sql = "SELECT * FROM \"" + getTableName() + "\" ORDER BY SmID";
-        List<PointFeature> features = new ArrayList<>();
+
+        // 预分配 ArrayList 容量以减少扩容开销
+        int estimatedCount = info.objectCount();
+        int initialCapacity = Math.max(16, Math.min(estimatedCount, 1_000_000));
+        List<PointFeature> features = new ArrayList<>(initialCapacity);
 
         try (PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
