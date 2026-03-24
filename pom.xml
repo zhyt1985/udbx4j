@@ -83,6 +83,14 @@
             <version>${jmh.version}</version>
             <scope>provided</scope>
         </dependency>
+
+        <!-- Micrometer - performance monitoring (optional) -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <version>1.12.0</version>
+            <optional>true</optional>
+        </dependency>
     </dependencies>
 
     <build>
