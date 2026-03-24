@@ -190,9 +190,6 @@ Dataset dataset = pool.getDataset("name");
 4. `phase3-concurrency.md` - 阶段 3 并发优化报告
 5. `phase3-summary.md` - 阶段 3 总结报告
 
-### 对比文档
-6. `vs-iobjects-java.md` - 与 iObjects Java 全面对比
-
 ### 测试数据
 7. `baseline.json` - 基线数据（JSON）
 8. `jmh-raw-results.json` - JMH 原始输出
@@ -220,19 +217,6 @@ Dataset dataset = pool.getDataset("name");
 - ✅ SQL 注入防护（PreparedStatement + 表名转义）
 - ✅ 资源泄漏防护（AutoCloseable + try-with-resources）
 - ✅ 线程安全（ConcurrentHashMap + AtomicInteger）
-
----
-
-## 🚀 与 iObjects Java 对比
-
-| 维度 | udbx4j | iObjects Java | udbx4j 优势 |
-|------|--------|--------------|-------------|
-| **单线程读取** | 0.34 ms | ~10-20 ms | **2-4x 更快** |
-| **并发支持** | 3.49x 扩展 | 不支持（JNI 全局锁） | **并发优势** |
-| **部署** | 单个 JAR | 原生库 + 许可 | **10x 简化** |
-| **成本** | MIT 免费 | 商业许可 | **100% 节省** |
-| **调试** | Java 堆栈 | JNI 模糊 | **易调试** |
-| **GraalVM** | 支持 | 不支持 | **云原生** |
 
 ---
 

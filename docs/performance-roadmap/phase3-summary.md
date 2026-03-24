@@ -53,12 +53,6 @@
    - 关键发现分析
    - 后续优化建议
 
-2. `docs/comparison/vs-iobjects-java.md`
-   - 与 iObjects Java 的全面对比
-   - 架构、性能、功能、成本对比
-   - 使用场景推荐
-   - 部署复杂度分析
-
 ### Task 22: 集成性能监控 ✅
 
 **创建文件**:
