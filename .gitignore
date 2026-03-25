@@ -38,3 +38,31 @@ SuperMap iObjects Java Javadoc/
 
 # Playwright MCP
 .playwright-mcp/
+
+# Project summary and development notes
+PROJECT_SUMMARY.md
+MEMORY.md
+memory/
+
+# Performance reports (keep for reference)
+# docs/performance-roadmap/
+
+# Build artifacts
+dependency-reduced-pom.xml
+
+# Maven local repository (should not be in project)
+.mvn/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# macOS
+.DS_Store
+._*
+
+# Temporary test files
+/tmp/
+temp/
+*.temp
