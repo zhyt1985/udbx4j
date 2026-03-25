@@ -6,6 +6,8 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.zhyt1985/udbx4j)](https://central.sonatype.com/artifact/io.github.zhyt1985/udbx4j)
 
+> **🎉 v1.0.0 已发布！** 现已发布到 Maven Central，可通过 Maven 依赖使用。
+
 ## 简介
 
 `udbx4j` 是超图 UDBX 空间数据格式的纯 Java 读写库。UDBX（Universal Spatial Database Extension）基于 SQLite 存储，支持矢量（点/线/面/CAD）和栅格空间数据。
