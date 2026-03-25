@@ -45,7 +45,7 @@ MEMORY.md
 memory/
 
 # Performance reports (keep for reference)
-# docs/performance-roadmap/
+docs/performance-roadmap/
 
 # Build artifacts
 dependency-reduced-pom.xml
