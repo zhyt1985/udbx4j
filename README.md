@@ -4,6 +4,7 @@
 
 [![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://openjdk.org/projects/jdk/17/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.zhyt1985/udbx4j)](https://central.sonatype.com/artifact/io.github.zhyt1985/udbx4j)
 
 ## 简介
 
