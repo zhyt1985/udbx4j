@@ -182,33 +182,90 @@ try (UdbxDataSource dataSource = UdbxDataSource.create("output.udbx")) {
 
 ```
 udbx4j/
-├── CLAUDE.md                          # 项目说明文档
+├── README.md                          # 项目介绍和快速开始
+├── CHANGELOG.md                       # 版本变更记录
+├── CONTRIBUTING.md                     # 贡献指南
+├── CLAUDE.md                          # 项目开发文档
+├── LICENSE                            # MIT 许可证
 ├── pom.xml                            # Maven 构建配置
 ├── Makefile                           # 构建脚本（预设 JAVA_HOME）
-├── src/
-│   ├── main/java/com/supermap/udbx/
-│   │   ├── UdbxDataSource.java         # 入口类：open()/create()
-│   │   ├── core/                       # 枚举与元信息
-│   │   │   ├── DatasetType.java        # 数据集类型枚举
-│   │   │   ├── GeometryType.java       # 几何类型枚举
-│   │   │   ├── FieldType.java          # 字段类型枚举
-│   │   │   ├── FieldInfo.java          # 字段元信息
-│   │   │   └── DatasetInfo.java        # 数据集元信息
-│   │   ├── dataset/                    # 数据集实现
-│   │   │   ├── Dataset.java            # 抽象基类
-│   │   │   ├── TabularDataset.java     # 纯属性表
-│   │   │   ├── VectorDataset.java      # 矢量基类
-│   │   │   ├── PointDataset.java       # 点数据集
-│   │   │   ├── LineDataset.java        # 线数据集
-│   │   │   ├── RegionDataset.java      # 面数据集
-│   │   │   └── CadDataset.java         # CAD数据集
-│   │   ├── geometry/                   # 几何对象
-│   │   │   ├── gaia/                   # SpatiaLite 格式
-│   │   │   └── cad/                    # SuperMap CAD 格式
-│   │   └── system/                     # 系统表 DAO
-│   └── test/java/com/supermap/udbx/
-│       ├── spec/                       # Spec 测试
-│       └── integration/                # 集成测试
+│
+├── docs/                              # 文档目录
+│   └── performance-roadmap/           # 性能优化路线图
+│       ├── phase0-baseline.md         # Phase 0: 性能基线
+│       ├── phase1-basics.md           # Phase 1: 基础优化（92.5% 提升）
+│       ├── phase2-streaming.md        # Phase 2: 流式优化
+│       ├── phase3-concurrency.md      # Phase 3: 并发优化（3.49x 扩展）
+│       └── phase3-summary.md          # Phase 3: 总结报告
+│
+├── rules/                             # 开发规范
+│   ├── java-coding-style.md          # Java 编码规范
+│   ├── java-testing.md               # 测试规范
+│   ├── java-patterns.md               # 设计模式
+│   └── spec-coding.md                # Spec 测试流程
+│
+├── .github/                           # GitHub 配置
+│   ├── ISSUE_TEMPLATE/                # Issue 模板
+│   │   ├── bug_report.md              # Bug 报告模板
+│   │   └── feature_request.md         # 功能请求模板
+│   └── PULL_REQUEST_TEMPLATE.md       # PR 模板
+│
+└── src/
+    ├── main/java/com/supermap/udbx/
+    │   ├── UdbxDataSource.java         # 入口类：open()/create()
+    │   ├── pool/                       # 对象池
+    │   │   └── GeometryFactoryPool.java # GeometryFactory 对象池
+    │   ├── core/                       # 核心枚举与元信息
+    │   │   ├── DatasetType.java        # 数据集类型枚举
+    │   │   ├── GeometryType.java       # 几何类型枚举
+    │   │   ├── FieldType.java          # 字段类型枚举
+    │   │   ├── FieldInfo.java          # 字段元信息
+    │   │   └── DatasetInfo.java        # 数据集元信息
+    │   ├── dataset/                    # 数据集实现
+    │   │   ├── Dataset.java            # 抽象基类
+    │   │   ├── TabularDataset.java     # 纯属性表
+    │   │   ├── VectorDataset.java      # 矢量基类
+    │   │   ├── PointDataset.java       # 点数据集
+    │   │   ├── LineDataset.java        # 线数据集
+    │   │   ├── RegionDataset.java      # 面数据集
+    │   │   ├── PointZDataset.java      # 三维点数据集
+    │   │   ├── LineZDataset.java       # 三维线数据集
+    │   │   ├── RegionZDataset.java     # 三维面数据集
+    │   │   └── CadDataset.java         # CAD 数据集
+    │   ├── geometry/                   # 几何对象
+    │   │   ├── gaia/                   # SpatiaLite GAIA 格式
+    │   │   │   ├── GaiaGeometryReader.java
+    │   │   │   ├── GaiaGeometryWriter.java
+    │   │   │   └── ...
+    │   │   └── cad/                    # SuperMap CAD 格式
+    │   │       ├── CadGeometryReader.java
+    │   │       ├── CadGeometryWriter.java
+    │   │       ├── CadGeometry.java
+    │   │       └── ...
+    │   ├── streaming/                  # 流式处理
+    │   │   ├── AutoCloseableStream.java # 资源管理
+    │   │   └── FeatureSpliterator.java  # 懒加载迭代器
+    │   ├── pool/                       # 连接池
+    │   │   └── UdbxDataSourcePool.java  # HikariCP 连接池
+    │   ├── metrics/                    # 性能监控（可选）
+    │   │   └── PerformanceMetrics.java  # Micrometer 集成
+    │   ├── system/                     # 系统表 DAO
+    │   │   ├── SmRegisterDao.java
+    │   │   ├── SmFieldInfoDao.java
+    │   │   └── SmDataSourceInfoDao.java
+    │   └── viewer/                     # 可视化工具（实验性）
+    │
+    └── test/java/com/supermap/udbx/
+        ├── spec/                       # Spec 测试（基于白皮书）
+        │   └── *SpecTest.java           # 21 个 Spec 测试类
+        ├── integration/                # 集成测试
+        │   └── *Test.java               # 14 个集成测试类
+        └── benchmark/                  # JMH 性能基准测试
+            ├── BaselineBenchmark.java   # 基线测试
+            ├── GeometryDecodeBenchmark.java
+            ├── StreamingReadBenchmark.java
+            ├── ConcurrentReadBenchmark.java
+            └── ManualConcurrentTest.java
 ```
 
 ## 构建与测试
