@@ -191,12 +191,7 @@ udbx4j/
 ├── Makefile                           # 构建脚本（预设 JAVA_HOME）
 │
 ├── docs/                              # 文档目录
-│   └── performance-roadmap/           # 性能优化路线图
-│       ├── phase0-baseline.md         # Phase 0: 性能基线
-│       ├── phase1-basics.md           # Phase 1: 基础优化（92.5% 提升）
-│       ├── phase2-streaming.md        # Phase 2: 流式优化
-│       ├── phase3-concurrency.md      # Phase 3: 并发优化（3.49x 扩展）
-│       └── phase3-summary.md          # Phase 3: 总结报告
+│   └── superpowers/                   # 开发计划和规格文档
 │
 ├── rules/                             # 开发规范
 │   ├── java-coding-style.md          # Java 编码规范
@@ -324,7 +319,7 @@ geoType(int32) | styleSize(int32) | Style(...) | ...geometry data...
 ## 参考文档
 
 - **白皮书**：`UDBX开放数据格式白皮书(V1.0).pdf`
-- **性能报告**：`docs/performance-roadmap/`（Phase 0-3 优化报告）
+- **变更日志**：`CHANGELOG.md`
 - **开发规范**：`rules/` 目录
 
 ## 许可证
