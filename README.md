@@ -48,7 +48,7 @@
 
 ```xml
 <dependency>
-    <groupId>com.github.zhyt1985</groupId>
+    <groupId>io.github.zhyt1985</groupId>
     <artifactId>udbx4j</artifactId>
     <version>1.0.0</version>
 </dependency>
