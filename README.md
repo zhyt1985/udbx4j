@@ -233,20 +233,6 @@ mvn package -DskipTests
 
 ## 技术架构
 
-### 为什么选择 udbx4j 而非 iObjects Java？
-
-| 维度 | iObjects Java | udbx4j |
-|------|---------------|--------|
-| **实现方式** | C++ 内核 + JNI 调用 | 纯 Java + JDBC |
-| **性能** | JNI 边界开销 | **快 2-5 倍** |
-| **稳定性** | JNI 内存泄漏风险 | **零泄漏** |
-| **部署** | 需要原生库 + 许可 | **单个 JAR** |
-| **依赖** | SuperMap 组件 | 仅 JDBC + JTS |
-| **学习成本** | 复杂 API（60+ 方法） | **简洁 API** |
-| **适用场景** | 桌面 GIS、复杂分析 | **数据迁移、微服务** |
-
-**详细对比**：参见 [性能优势技术路线](docs/performance-advantage-roadmap.md)
-
 ### UDBX 格式要点
 
 | 概念 | 说明 |
@@ -281,7 +267,8 @@ geoType(int32) | styleSize(int32) | Style(...) | ...geometry data...
 ## 参考文档
 
 - **白皮书**：`UDBX开放数据格式白皮书(V1.0).pdf`
-- **iObjects Java API 文档**：`SuperMap iObjects Java Javadoc/`
+- **性能报告**：`docs/performance-roadmap/`（Phase 0-3 优化报告）
+- **开发规范**：`rules/` 目录
 
 ## 许可证
 
