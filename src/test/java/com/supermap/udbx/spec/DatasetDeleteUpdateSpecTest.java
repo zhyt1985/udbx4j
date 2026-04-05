@@ -38,27 +38,27 @@ class DatasetDeleteUpdateSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointDataset pd = ds.createPointDataset("Points", 4326);
-            pd.addFeature(1, GF.createPoint(new Coordinate(1, 2)), Map.of());
-            pd.addFeature(2, GF.createPoint(new Coordinate(3, 4)), Map.of());
-            pd.addFeature(3, GF.createPoint(new Coordinate(5, 6)), Map.of());
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(1, 2)), Map.of()));
+            pd.insert(new PointFeature(2, GF.createPoint(new Coordinate(3, 4)), Map.of()));
+            pd.insert(new PointFeature(3, GF.createPoint(new Coordinate(5, 6)), Map.of()));
 
-            assertThat(pd.getFeatures()).hasSize(3);
+            assertThat(pd.list()).hasSize(3);
 
             // 删除 SmID=2
-            pd.deleteFeature(2);
+            pd.delete(2);
 
-            assertThat(pd.getFeatures()).hasSize(2);
-            assertThat(pd.getFeature(2)).isNull();
-            assertThat(pd.getFeatures()).hasSize(2);
+            assertThat(pd.list()).hasSize(2);
+            assertThat(pd.getById(2)).isNull();
+            assertThat(pd.list()).hasSize(2);
         }
 
         // 重新打开验证持久化
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             PointDataset pd = (PointDataset) ds.getDataset("Points");
             assertThat(pd.getObjectCount()).isEqualTo(2);
-            assertThat(pd.getFeature(2)).isNull();
-            assertThat(pd.getFeature(1)).isNotNull();
-            assertThat(pd.getFeature(3)).isNotNull();
+            assertThat(pd.getById(2)).isNull();
+            assertThat(pd.getById(1)).isNotNull();
+            assertThat(pd.getById(3)).isNotNull();
         }
     }
 
@@ -68,9 +68,9 @@ class DatasetDeleteUpdateSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointDataset pd = ds.createPointDataset("Points", 4326);
-            pd.addFeature(1, GF.createPoint(new Coordinate(1, 2)), Map.of());
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(1, 2)), Map.of()));
 
-            assertThatThrownBy(() -> pd.deleteFeature(999))
+            assertThatThrownBy(() -> pd.delete(999))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
         }
@@ -80,24 +80,24 @@ class DatasetDeleteUpdateSpecTest {
     void updateFeature_should_change_geometry_and_attributes(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("update.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "NAME", FieldType.NText, "名称", false),
-                new FieldInfo(0, "VALUE", FieldType.Int32, "数值", false)
+                new FieldInfo(0, "NAME", FieldType.NTEXT, "名称", false),
+                new FieldInfo(0, "VALUE", FieldType.INT32, "数值", false)
         );
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointDataset pd = ds.createPointDataset("Points", 4326, fields);
-            pd.addFeature(1, GF.createPoint(new Coordinate(1, 2)),
-                    Map.of("NAME", "OldName", "VALUE", 100));
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(1, 2)),
+                    Map.of("NAME", "OldName", "VALUE", 100)));
 
             // 更新
-            pd.updateFeature(1, GF.createPoint(new Coordinate(10, 20)),
+            pd.update(1, GF.createPoint(new Coordinate(10, 20)),
                     Map.of("NAME", "NewName", "VALUE", 200));
         }
 
         // 验证更新结果
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             PointDataset pd = (PointDataset) ds.getDataset("Points");
-            PointFeature f = pd.getFeature(1);
+            PointFeature f = pd.getById(1);
 
             assertThat(f.geometry().getX()).isEqualTo(10.0);
             assertThat(f.geometry().getY()).isEqualTo(20.0);
@@ -112,9 +112,9 @@ class DatasetDeleteUpdateSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointDataset pd = ds.createPointDataset("Points", 4326);
-            pd.addFeature(1, GF.createPoint(new Coordinate(1, 2)), Map.of());
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(1, 2)), Map.of()));
 
-            assertThatThrownBy(() -> pd.updateFeature(999, GF.createPoint(new Coordinate(0, 0)), Map.of()))
+            assertThatThrownBy(() -> pd.update(999, GF.createPoint(new Coordinate(0, 0)), Map.of()))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
         }
@@ -123,38 +123,38 @@ class DatasetDeleteUpdateSpecTest {
     @Test
     void tabular_deleteRow_should_work(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("tabular_delete.udbx").toString();
-        List<FieldInfo> fields = List.of(new FieldInfo(0, "CITY", FieldType.NText, "城市", false));
+        List<FieldInfo> fields = List.of(new FieldInfo(0, "CITY", FieldType.NTEXT, "城市", false));
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             TabularDataset td = ds.createTabularDataset("Cities", fields);
-            td.addRow(1, Map.of("CITY", "Beijing"));
-            td.addRow(2, Map.of("CITY", "Shanghai"));
+            td.insert(new TabularRecord(1, Map.of("CITY", "Beijing")));
+            td.insert(new TabularRecord(2, Map.of("CITY", "Shanghai")));
 
-            assertThat(td.getRecords()).hasSize(2);
+            assertThat(td.list()).hasSize(2);
 
-            td.deleteRow(1);
+            td.delete(1);
 
-            assertThat(td.getRecords()).hasSize(1);
-            assertThat(td.getRecord(1)).isNull();
-            assertThat(td.getRecord(2)).isNotNull();
+            assertThat(td.list()).hasSize(1);
+            assertThat(td.getById(1)).isNull();
+            assertThat(td.getById(2)).isNotNull();
         }
     }
 
     @Test
     void tabular_updateRow_should_work(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("tabular_update.udbx").toString();
-        List<FieldInfo> fields = List.of(new FieldInfo(0, "CITY", FieldType.NText, "城市", false));
+        List<FieldInfo> fields = List.of(new FieldInfo(0, "CITY", FieldType.NTEXT, "城市", false));
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             TabularDataset td = ds.createTabularDataset("Cities", fields);
-            td.addRow(1, Map.of("CITY", "OldCity"));
+            td.insert(new TabularRecord(1, Map.of("CITY", "OldCity")));
 
-            td.updateRow(1, Map.of("CITY", "NewCity"));
+            td.update(1, Map.of("CITY", "NewCity"));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             TabularDataset td = (TabularDataset) ds.getDataset("Cities");
-            TabularRecord r = td.getRecord(1);
+            TabularRecord r = td.getById(1);
             assertThat(r.attributes()).containsEntry("CITY", "NewCity");
         }
     }
@@ -165,19 +165,19 @@ class DatasetDeleteUpdateSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             CadDataset cd = ds.createCadDataset("CAD");
-            cd.addFeature(1, new com.supermap.udbx.geometry.cad.CadGeometry.GeoPoint(
+            cd.insert(new CadFeature(1, new com.supermap.udbx.geometry.cad.CadGeometry.GeoPoint(
                     1.0, 2.0, new com.supermap.udbx.geometry.cad.StyleMarker(
-                            0, 0, 0, 0, 0, 0, (byte) 0, (byte) 0, (short) 0, (short) 0, (short) 0, 0)), Map.of());
-            cd.addFeature(2, new com.supermap.udbx.geometry.cad.CadGeometry.GeoPoint(
+                    0, 0, 0, 0, 0, 0, (byte) 0, (byte) 0, (short) 0, (short) 0, (short) 0, 0)), Map.of()));
+            cd.insert(new CadFeature(2, new com.supermap.udbx.geometry.cad.CadGeometry.GeoPoint(
                     3.0, 4.0, new com.supermap.udbx.geometry.cad.StyleMarker(
-                            0, 0, 0, 0, 0, 0, (byte) 0, (byte) 0, (short) 0, (short) 0, (short) 0, 0)), Map.of());
+                    0, 0, 0, 0, 0, 0, (byte) 0, (byte) 0, (short) 0, (short) 0, (short) 0, 0)), Map.of()));
 
-            assertThat(cd.getFeatures()).hasSize(2);
+            assertThat(cd.list()).hasSize(2);
 
-            cd.deleteFeature(1);
+            cd.delete(1);
 
-            assertThat(cd.getFeatures()).hasSize(1);
-            assertThat(cd.getFeature(1)).isNull();
+            assertThat(cd.list()).hasSize(1);
+            assertThat(cd.getById(1)).isNull();
         }
     }
 }

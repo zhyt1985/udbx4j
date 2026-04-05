@@ -2,6 +2,7 @@ package com.supermap.udbx.benchmark;
 
 import com.supermap.udbx.UdbxDataSource;
 import com.supermap.udbx.dataset.PointDataset;
+import com.supermap.udbx.dataset.PointFeature;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
@@ -114,7 +115,7 @@ public class ManualConcurrentTest {
     private static int singleThreadRead(Path file) {
         try (UdbxDataSource ds = UdbxDataSource.open(file.toString())) {
             PointDataset dataset = (PointDataset) ds.getDataset("points");
-            return dataset.getFeatures().size();
+            return dataset.list().size();
         } catch (Exception e) {
             throw new RuntimeException("Single thread read failed", e);
         }
@@ -150,7 +151,7 @@ public class ManualConcurrentTest {
     private static int readInThread(Path file) {
         try (UdbxDataSource ds = UdbxDataSource.open(file.toString())) {
             PointDataset dataset = (PointDataset) ds.getDataset("points");
-            return dataset.getFeatures().size();
+            return dataset.list().size();
         } catch (Exception e) {
             System.err.println("Thread read failed: " + e.getMessage());
             return 0;
@@ -163,7 +164,7 @@ public class ManualConcurrentTest {
             for (int i = 0; i < count; i++) {
                 Point p = GEOM_FACTORY.createPoint(
                     new Coordinate(116.0 + i * 0.0001, 39.0 + i * 0.0001));
-                pd.addFeature(i + 1, p, Map.of());
+                pd.insert(new PointFeature(i + 1, p, Map.of()));
             }
         }
     }

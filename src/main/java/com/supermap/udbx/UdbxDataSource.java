@@ -1,9 +1,12 @@
 package com.supermap.udbx;
 
 import com.supermap.udbx.core.DatasetInfo;
-import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.core.DatasetKind;
 import com.supermap.udbx.core.FieldInfo;
 import com.supermap.udbx.core.FieldType;
+import com.supermap.udbx.core.UdbxConstraintError;
+import com.supermap.udbx.core.UdbxIOError;
+import com.supermap.udbx.core.UdbxUnsupportedError;
 import com.supermap.udbx.dataset.CadDataset;
 import com.supermap.udbx.dataset.Dataset;
 import com.supermap.udbx.dataset.LineDataset;
@@ -13,6 +16,7 @@ import com.supermap.udbx.dataset.PointZDataset;
 import com.supermap.udbx.dataset.RegionDataset;
 import com.supermap.udbx.dataset.RegionZDataset;
 import com.supermap.udbx.dataset.TabularDataset;
+import com.supermap.udbx.dataset.TextDataset;
 import com.supermap.udbx.system.SmFieldInfoDao;
 import com.supermap.udbx.system.SmRegisterDao;
 import com.supermap.udbx.system.UdbxSchemaInitializer;
@@ -36,7 +40,7 @@ import java.util.Optional;
  * <pre>{@code
  * try (UdbxDataSource ds = UdbxDataSource.open("path/to/file.udbx")) {
  *     PointDataset points = (PointDataset) ds.getDataset("BaseMap_P");
- *     List<PointFeature> features = points.getFeatures();
+ *     List<PointFeature> features = points.list();
  * }
  * }</pre>
  *
@@ -44,7 +48,7 @@ import java.util.Optional;
  * <pre>{@code
  * try (UdbxDataSource ds = UdbxDataSource.create("path/to/new.udbx")) {
  *     PointDataset pd = ds.createPointDataset("MyPoints", 4326);
- *     pd.addFeature(1, point, Map.of());
+ *     pd.insert(new PointFeature(1, point, Map.of()));
  * }
  * }</pre>
  */
@@ -125,7 +129,7 @@ public class UdbxDataSource implements AutoCloseable {
      * @return 所有数据集的 {@link DatasetInfo} 列表，若数据源为空则返回空列表
      * @throws RuntimeException 若查询失败
      */
-    public List<DatasetInfo> listDatasetInfos() {
+    public List<DatasetInfo> listDatasets() {
         try {
             return registerDao.findAll();
         } catch (SQLException e) {
@@ -136,7 +140,7 @@ public class UdbxDataSource implements AutoCloseable {
     // ── 数据集创建工厂方法 ────────────────────────────────────────────────────
 
     /**
-     * 在当前数据源中创建一个新的点数据集（DatasetType=Point）。
+     * 在当前数据源中创建一个新的点数据集（DatasetKind=Point）。
      *
      * @param name 数据集名称（同时作为数据表名）
      * @param srid 坐标系 ID（建议 4326）
@@ -148,7 +152,7 @@ public class UdbxDataSource implements AutoCloseable {
     }
 
     /**
-     * 在当前数据源中创建一个新的点数据集（DatasetType=Point），并附带用户字段定义。
+     * 在当前数据源中创建一个新的点数据集（DatasetKind=Point），并附带用户字段定义。
      *
      * @param name   数据集名称
      * @param srid   坐标系 ID
@@ -156,12 +160,12 @@ public class UdbxDataSource implements AutoCloseable {
      * @return 可立即使用的 PointDataset 实例
      */
     public PointDataset createPointDataset(String name, int srid, List<FieldInfo> fields) {
-        return (PointDataset) createVectorDataset(name, DatasetType.Point, srid,
+        return (PointDataset) createVectorDataset(name, DatasetKind.POINT, srid,
                 "POINT", 1, 2, fields);
     }
 
     /**
-     * 在当前数据源中创建一个新的线数据集（DatasetType=Line）。
+     * 在当前数据源中创建一个新的线数据集（DatasetKind=Line）。
      *
      * @param name 数据集名称
      * @param srid 坐标系 ID
@@ -172,15 +176,15 @@ public class UdbxDataSource implements AutoCloseable {
     }
 
     /**
-     * 在当前数据源中创建一个新的线数据集（DatasetType=Line），并附带用户字段定义。
+     * 在当前数据源中创建一个新的线数据集（DatasetKind=Line），并附带用户字段定义。
      */
     public LineDataset createLineDataset(String name, int srid, List<FieldInfo> fields) {
-        return (LineDataset) createVectorDataset(name, DatasetType.Line, srid,
+        return (LineDataset) createVectorDataset(name, DatasetKind.LINE, srid,
                 "MULTILINESTRING", 5, 2, fields);
     }
 
     /**
-     * 在当前数据源中创建一个新的面数据集（DatasetType=Region）。
+     * 在当前数据源中创建一个新的面数据集（DatasetKind=Region）。
      *
      * @param name 数据集名称
      * @param srid 坐标系 ID
@@ -191,17 +195,17 @@ public class UdbxDataSource implements AutoCloseable {
     }
 
     /**
-     * 在当前数据源中创建一个新的面数据集（DatasetType=Region），并附带用户字段定义。
+     * 在当前数据源中创建一个新的面数据集（DatasetKind=Region），并附带用户字段定义。
      */
     public RegionDataset createRegionDataset(String name, int srid, List<FieldInfo> fields) {
-        return (RegionDataset) createVectorDataset(name, DatasetType.Region, srid,
+        return (RegionDataset) createVectorDataset(name, DatasetKind.REGION, srid,
                 "MULTIPOLYGON", 6, 2, fields);
     }
 
     // ── 三维矢量数据集工厂方法 ─────────────────────────────────────────────────
 
     /**
-     * 在当前数据源中创建一个新的三维点数据集（DatasetType=PointZ=101）。
+     * 在当前数据源中创建一个新的三维点数据集（DatasetKind=PointZ=101）。
      */
     public PointZDataset createPointZDataset(String name, int srid) {
         return createPointZDataset(name, srid, Collections.emptyList());
@@ -211,12 +215,12 @@ public class UdbxDataSource implements AutoCloseable {
      * 在当前数据源中创建一个新的三维点数据集，并附带用户字段定义。
      */
     public PointZDataset createPointZDataset(String name, int srid, List<FieldInfo> fields) {
-        return (PointZDataset) createVectorDataset(name, DatasetType.PointZ, srid,
+        return (PointZDataset) createVectorDataset(name, DatasetKind.POINT_Z, srid,
                 "POINT", 1001, 3, fields);
     }
 
     /**
-     * 在当前数据源中创建一个新的三维线数据集（DatasetType=LineZ=103）。
+     * 在当前数据源中创建一个新的三维线数据集（DatasetKind=LineZ=103）。
      */
     public LineZDataset createLineZDataset(String name, int srid) {
         return createLineZDataset(name, srid, Collections.emptyList());
@@ -226,12 +230,12 @@ public class UdbxDataSource implements AutoCloseable {
      * 在当前数据源中创建一个新的三维线数据集，并附带用户字段定义。
      */
     public LineZDataset createLineZDataset(String name, int srid, List<FieldInfo> fields) {
-        return (LineZDataset) createVectorDataset(name, DatasetType.LineZ, srid,
+        return (LineZDataset) createVectorDataset(name, DatasetKind.LINE_Z, srid,
                 "MULTILINESTRING", 1005, 3, fields);
     }
 
     /**
-     * 在当前数据源中创建一个新的三维面数据集（DatasetType=RegionZ=105）。
+     * 在当前数据源中创建一个新的三维面数据集（DatasetKind=RegionZ=105）。
      */
     public RegionZDataset createRegionZDataset(String name, int srid) {
         return createRegionZDataset(name, srid, Collections.emptyList());
@@ -241,12 +245,12 @@ public class UdbxDataSource implements AutoCloseable {
      * 在当前数据源中创建一个新的三维面数据集，并附带用户字段定义。
      */
     public RegionZDataset createRegionZDataset(String name, int srid, List<FieldInfo> fields) {
-        return (RegionZDataset) createVectorDataset(name, DatasetType.RegionZ, srid,
+        return (RegionZDataset) createVectorDataset(name, DatasetKind.REGION_Z, srid,
                 "MULTIPOLYGON", 1006, 3, fields);
     }
 
     /**
-     * 在当前数据源中创建一个新的属性表数据集（DatasetType=Tabular，无几何）。
+     * 在当前数据源中创建一个新的属性表数据集（DatasetKind=Tabular，无几何）。
      *
      * @param name 数据集名称
      * @return 可立即使用的 TabularDataset 实例
@@ -256,7 +260,7 @@ public class UdbxDataSource implements AutoCloseable {
     }
 
     /**
-     * 在当前数据源中创建一个新的属性表数据集（DatasetType=Tabular，无几何），并附带用户字段定义。
+     * 在当前数据源中创建一个新的属性表数据集（DatasetKind=Tabular，无几何），并附带用户字段定义。
      *
      * @param name   数据集名称
      * @param fields 用户字段列表
@@ -268,20 +272,55 @@ public class UdbxDataSource implements AutoCloseable {
                     .append("  SmID     INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,")
                     .append("  SmUserID INTEGER DEFAULT 0");
             for (FieldInfo f : fields) {
-                ddl.append(", \"").append(f.fieldName()).append("\" ").append(sqlTypeFor(f.fieldType()));
+                ddl.append(", \"").append(f.name()).append("\" ").append(sqlTypeFor(f.fieldType()));
             }
             ddl.append(")");
             try (Statement stmt = conn.createStatement()) {
                 stmt.executeUpdate(ddl.toString());
             }
-            int datasetId = registerDao.insert(name, DatasetType.Tabular, 0, "SmID", null);
+            int datasetId = registerDao.insert(name, DatasetKind.TABULAR, 0, "SmID", null);
             if (!fields.isEmpty()) {
                 new SmFieldInfoDao(conn).insertAll(datasetId, fields);
             }
-            DatasetInfo info = new DatasetInfo(datasetId, name, DatasetType.Tabular, 0, 0);
+            DatasetInfo info = new DatasetInfo(datasetId, name, DatasetKind.TABULAR, 0, 0);
             return new TabularDataset(conn, info);
         } catch (SQLException e) {
             throw new RuntimeException("创建属性表数据集 [" + name + "] 失败", e);
+        }
+    }
+
+    public TextDataset createTextDataset(String name, int srid) {
+        return createTextDataset(name, srid, Collections.emptyList());
+    }
+
+    /**
+     * 在当前数据源中创建一个新的文本数据集（DatasetKind=TEXT=7），并附带用户字段定义。
+     *
+     * <p>文本数据集使用 GeoText 格式存储文本对象（位置、内容、风格）。
+     * 不注册到 geometry_columns（文本对象范围存储于 SmIndexKey 列）。
+     */
+    public TextDataset createTextDataset(String name, int srid, List<FieldInfo> fields) {
+        try {
+            StringBuilder ddl = new StringBuilder("CREATE TABLE \"").append(name).append("\" (")
+                    .append("  SmID       INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,")
+                    .append("  SmUserID   INTEGER DEFAULT 0,")
+                    .append("  \"SmGeometry\" BLOB," )
+                    .append("  SmIndexKey POLYGON");
+            for (FieldInfo f : fields) {
+                ddl.append(", \"").append(f.name()).append("\" ").append(sqlTypeFor(f.fieldType()));
+            }
+            ddl.append(")");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(ddl.toString());
+            }
+            int datasetId = registerDao.insert(name, DatasetKind.TEXT, srid, "SmID", "SmGeometry");
+            if (!fields.isEmpty()) {
+                new SmFieldInfoDao(conn).insertAll(datasetId, fields);
+            }
+            DatasetInfo info = new DatasetInfo(datasetId, name, DatasetKind.TEXT, 0, srid);
+            return new TextDataset(conn, info);
+        } catch (SQLException e) {
+            throw new RuntimeException("创建文本数据集 [" + name + "] 失败", e);
         }
     }
 
@@ -290,7 +329,7 @@ public class UdbxDataSource implements AutoCloseable {
     }
 
     /**
-     * 在当前数据源中创建一个新的 CAD 数据集（DatasetType=CAD=149），并附带用户字段定义。
+     * 在当前数据源中创建一个新的 CAD 数据集（DatasetKind=CAD=149），并附带用户字段定义。
      *
      * <p>CAD 数据集不注册到 geometry_columns（使用 SuperMap 自定义 GeoHeader 格式）。
      */
@@ -301,17 +340,17 @@ public class UdbxDataSource implements AutoCloseable {
                     .append("  SmUserID   INTEGER DEFAULT 0,")
                     .append("  \"SmGeometry\" BLOB");
             for (FieldInfo f : fields) {
-                ddl.append(", \"").append(f.fieldName()).append("\" ").append(sqlTypeFor(f.fieldType()));
+                ddl.append(", \"").append(f.name()).append("\" ").append(sqlTypeFor(f.fieldType()));
             }
             ddl.append(")");
             try (Statement stmt = conn.createStatement()) {
                 stmt.executeUpdate(ddl.toString());
             }
-            int datasetId = registerDao.insert(name, DatasetType.CAD, 0, "SmID", "SmGeometry");
+            int datasetId = registerDao.insert(name, DatasetKind.CAD, 0, "SmID", "SmGeometry");
             if (!fields.isEmpty()) {
                 new SmFieldInfoDao(conn).insertAll(datasetId, fields);
             }
-            DatasetInfo info = new DatasetInfo(datasetId, name, DatasetType.CAD, 0, 0);
+            DatasetInfo info = new DatasetInfo(datasetId, name, DatasetKind.CAD, 0, 0);
             return new CadDataset(conn, info);
         } catch (SQLException e) {
             throw new RuntimeException("创建 CAD 数据集 [" + name + "] 失败", e);
@@ -337,20 +376,21 @@ public class UdbxDataSource implements AutoCloseable {
     // -----------------------------------------------------------------------
 
     /**
-     * 根据 DatasetInfo 中的 DatasetType 创建具体数据集实例。
+     * 根据 DatasetInfo 中的 DatasetKind 创建具体数据集实例。
      */
     private Dataset createDataset(DatasetInfo info) {
-        return switch (info.datasetType()) {
-            case Tabular -> new TabularDataset(conn, info);
-            case Point -> new PointDataset(conn, info);
-            case PointZ -> new PointZDataset(conn, info);
-            case Line -> new LineDataset(conn, info);
-            case LineZ -> new LineZDataset(conn, info);
-            case Region -> new RegionDataset(conn, info);
-            case RegionZ -> new RegionZDataset(conn, info);
+        return switch (info.kind()) {
+            case TABULAR -> new TabularDataset(conn, info);
+            case POINT -> new PointDataset(conn, info);
+            case POINT_Z -> new PointZDataset(conn, info);
+            case LINE -> new LineDataset(conn, info);
+            case LINE_Z -> new LineZDataset(conn, info);
+            case REGION -> new RegionDataset(conn, info);
+            case REGION_Z -> new RegionZDataset(conn, info);
+            case TEXT -> new TextDataset(conn, info);
             case CAD -> new CadDataset(conn, info);
             default -> throw new UnsupportedOperationException(
-                    "暂不支持的数据集类型: " + info.datasetType() + "（数据集: " + info.datasetName() + "）");
+                    "暂不支持的数据集类型: " + info.kind() + "（数据集: " + info.name() + "）");
         };
     }
 
@@ -364,13 +404,13 @@ public class UdbxDataSource implements AutoCloseable {
      * @param geometryType geometry_columns.geometry_type 值
      * @param coordDim     坐标维度（2 或 3）
      */
-    private Dataset createVectorDataset(String name, DatasetType type, int srid,
+    private Dataset createVectorDataset(String name, DatasetKind type, int srid,
                                          String geoTypeName, int geometryType, int coordDim) {
         return createVectorDataset(name, type, srid, geoTypeName, geometryType, coordDim,
                 Collections.emptyList());
     }
 
-    private Dataset createVectorDataset(String name, DatasetType type, int srid,
+    private Dataset createVectorDataset(String name, DatasetKind type, int srid,
                                          String geoTypeName, int geometryType, int coordDim,
                                          List<FieldInfo> fields) {
         try {
@@ -380,7 +420,7 @@ public class UdbxDataSource implements AutoCloseable {
                     .append("  SmUserID INTEGER DEFAULT 0,")
                     .append("  \"SmGeometry\" ").append(geoTypeName).append(" DEFAULT ''");
             for (FieldInfo f : fields) {
-                ddl.append(", \"").append(f.fieldName()).append("\" ").append(sqlTypeFor(f.fieldType()));
+                ddl.append(", \"").append(f.name()).append("\" ").append(sqlTypeFor(f.fieldType()));
             }
             ddl.append(")");
             try (Statement stmt = conn.createStatement()) {
@@ -393,7 +433,7 @@ public class UdbxDataSource implements AutoCloseable {
             try (var stmt = conn.prepareStatement(
                     "INSERT INTO geometry_columns " +
                     "(f_table_name, f_geometry_column, geometry_type, coord_dimension, srid, spatial_index_enabled) " +
-                    "VALUES (?, 'smgeometry', ?, ?, ?, 0)")) {
+                    "VALUES (?, 'SmGeometry', ?, ?, ?, 0)")) {
                 stmt.setString(1, name.toLowerCase());
                 stmt.setInt(2, geometryType);
                 stmt.setInt(3, coordDim);
@@ -418,10 +458,10 @@ public class UdbxDataSource implements AutoCloseable {
      */
     private static String sqlTypeFor(FieldType type) {
         return switch (type) {
-            case Boolean, Byte, Int16, Int32, Int64 -> "INTEGER";
-            case Single, Double -> "REAL";
-            case Binary, Geometry -> "BLOB";
-            default -> "TEXT";  // Char, NText, Text, Date, Time
+            case BOOLEAN, BYTE, INT16, INT32, INT64 -> "INTEGER";
+            case SINGLE, DOUBLE -> "REAL";
+            case BINARY, GEOMETRY -> "BLOB";
+            default -> "TEXT";  // CHAR, NTEXT, TEXT, DATE, TIME
         };
     }
 }

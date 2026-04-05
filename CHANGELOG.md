@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-04-04
+
+### Breaking Changes
+- `DatasetType` 枚举重命名为 `DatasetKind`
+- `smId` 字段重命名为 `id`（所有 Feature/Record 类型）
+- `getFeatures()` → `list()`
+- `getFeatures(offset, Limit)` → `list(QueryOptions)`
+- `getFeature(int)` → `getById(int)`
+- `streamFeatures()` → `stream()`
+- `getCount()` → `count()`
+- `addFeature(...)` → `insert(feature)`
+- `addFeaturesBatch(...)` → `insertMany(features)`
+- `updateFeature(...)` → `update(id, changes)`
+- `deleteFeature(...)` / `deleteRow(...)` → `delete(id)`
+- `getRecords()` → `list()`（TabularDataset）
+- `getRecord(int)` → `getById(int)`（TabularDataset）
+- `addRow(...)` → `insert(record)`（TabularDataset）
+- `updateRow(...)` → `update(id, changes)`（TabularDataset）
+
+### Added
+- 新增三维矢量数据集：`PointZDataset`、`LineZDataset`、`RegionZDataset`
+- 新增 `QueryOptions` 记录类（支持 ids/limit/offset 过滤）
+- 新增 `geometry.geojson` 包：JTS ↔ GeoJSON-like 双向转换（`GeoJsonGeometry`、`GeoJsonUtils`）
+- `GeoJsonGeometry`：sealed interface，含 `PointGeometry`、`MultiLineStringGeometry`、`MultiPolygonGeometry`
+- 所有数据集新增 `list(QueryOptions)`、`count()`、`insertMany()`、`stream()`、`stream(QueryOptions)` 方法
+
 ## [Unreleased]
 
 ### Added - Performance Optimization (2025-01-24)

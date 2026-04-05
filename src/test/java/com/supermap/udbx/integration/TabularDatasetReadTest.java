@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>测试数据来源：SampleData.udbx 中的 TabularDT 数据集。
  * <pre>
- *   TabularDT: DatasetType=0 (Tabular), ObjectCount=15, SRID=0
+ *   TabularDT: DatasetKind=0 (Tabular), ObjectCount=15, SRID=0
  * </pre>
  *
  * <p>对应白皮书 §3.1.1（纯属性表数据集），无几何字段。
@@ -31,7 +31,7 @@ class TabularDatasetReadTest {
             TabularDataset dataset = (TabularDataset) ds.getDataset("TabularDT");
 
             assertThat(dataset).isNotNull();
-            assertThat(dataset.getInfo().datasetName()).isEqualTo("TabularDT");
+            assertThat(dataset.getInfo().name()).isEqualTo("TabularDT");
         }
     }
 
@@ -40,7 +40,7 @@ class TabularDatasetReadTest {
         try (UdbxDataSource ds = UdbxDataSource.open(SAMPLE_DB)) {
             TabularDataset dataset = (TabularDataset) ds.getDataset("TabularDT");
 
-            List<TabularRecord> records = dataset.getRecords();
+            List<TabularRecord> records = dataset.list();
 
             // TabularDT: ObjectCount=15
             assertThat(records).hasSize(15);
@@ -52,12 +52,12 @@ class TabularDatasetReadTest {
         try (UdbxDataSource ds = UdbxDataSource.open(SAMPLE_DB)) {
             TabularDataset dataset = (TabularDataset) ds.getDataset("TabularDT");
 
-            List<TabularRecord> records = dataset.getRecords();
+            List<TabularRecord> records = dataset.list();
 
             // 每条记录有 smId 和属性，但无几何字段
             assertThat(records).isNotEmpty();
             TabularRecord firstRecord = records.get(0);
-            assertThat(firstRecord.smId()).isGreaterThan(0);
+            assertThat(firstRecord.id()).isGreaterThan(0);
             // 属性中不含 SmGeometry 字段
             assertThat(firstRecord.attributes()).doesNotContainKey("SmGeometry");
         }

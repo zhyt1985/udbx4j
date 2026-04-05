@@ -1,19 +1,19 @@
 package com.supermap.udbx.spec;
 
-import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.core.DatasetKind;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Spec 测试：验证 DatasetType 枚举值与白皮书的一致性。
+ * Spec 测试：验证 DatasetKind 枚举值与白皮书的一致性。
  *
  * <p>对应白皮书章节：表 1（数据集类型）
  *
  * <p>枚举值定义：
  * <pre>
- * SmDatasetType 字段值 → Java 枚举常量
+ * SmDatasetKind 字段值 → Java 枚举常量
  *   0   → Tabular
  *   1   → Point
  *   3   → Line
@@ -32,103 +32,103 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *   206 → Mosaic
  * </pre>
  */
-class DatasetTypeSpecTest {
+class DatasetKindSpecTest {
 
     @Test
     void tabular_type_value_must_be_0() {
-        assertThat(DatasetType.Tabular.getValue()).isEqualTo(0);
+        assertThat(DatasetKind.TABULAR.getValue()).isEqualTo(0);
     }
 
     @Test
     void point_type_value_must_be_1() {
-        assertThat(DatasetType.Point.getValue()).isEqualTo(1);
+        assertThat(DatasetKind.POINT.getValue()).isEqualTo(1);
     }
 
     @Test
     void line_type_value_must_be_3() {
-        assertThat(DatasetType.Line.getValue()).isEqualTo(3);
+        assertThat(DatasetKind.LINE.getValue()).isEqualTo(3);
     }
 
     @Test
     void network_type_value_must_be_4() {
-        assertThat(DatasetType.Network.getValue()).isEqualTo(4);
+        assertThat(DatasetKind.NETWORK.getValue()).isEqualTo(4);
     }
 
     @Test
     void region_type_value_must_be_5() {
-        assertThat(DatasetType.Region.getValue()).isEqualTo(5);
+        assertThat(DatasetKind.REGION.getValue()).isEqualTo(5);
     }
 
     @Test
     void text_type_value_must_be_7() {
-        assertThat(DatasetType.Text.getValue()).isEqualTo(7);
+        assertThat(DatasetKind.TEXT.getValue()).isEqualTo(7);
     }
 
     @Test
     void grid_type_value_must_be_83() {
-        assertThat(DatasetType.Grid.getValue()).isEqualTo(83);
+        assertThat(DatasetKind.GRID.getValue()).isEqualTo(83);
     }
 
     @Test
     void image_type_value_must_be_88() {
-        assertThat(DatasetType.Image.getValue()).isEqualTo(88);
+        assertThat(DatasetKind.IMAGE.getValue()).isEqualTo(88);
     }
 
     @Test
     void voxel_grid_type_value_must_be_89() {
-        assertThat(DatasetType.VoxelGrid.getValue()).isEqualTo(89);
+        assertThat(DatasetKind.VOXEL_GRID.getValue()).isEqualTo(89);
     }
 
     @Test
     void point_z_type_value_must_be_101() {
-        assertThat(DatasetType.PointZ.getValue()).isEqualTo(101);
+        assertThat(DatasetKind.POINT_Z.getValue()).isEqualTo(101);
     }
 
     @Test
     void line_z_type_value_must_be_103() {
-        assertThat(DatasetType.LineZ.getValue()).isEqualTo(103);
+        assertThat(DatasetKind.LINE_Z.getValue()).isEqualTo(103);
     }
 
     @Test
     void region_z_type_value_must_be_105() {
-        assertThat(DatasetType.RegionZ.getValue()).isEqualTo(105);
+        assertThat(DatasetKind.REGION_Z.getValue()).isEqualTo(105);
     }
 
     @Test
     void cad_type_value_must_be_149() {
-        assertThat(DatasetType.CAD.getValue()).isEqualTo(149);
+        assertThat(DatasetKind.CAD.getValue()).isEqualTo(149);
     }
 
     @Test
     void model_type_value_must_be_203() {
-        assertThat(DatasetType.Model.getValue()).isEqualTo(203);
+        assertThat(DatasetKind.MODEL.getValue()).isEqualTo(203);
     }
 
     @Test
     void network3d_type_value_must_be_205() {
-        assertThat(DatasetType.Network3D.getValue()).isEqualTo(205);
+        assertThat(DatasetKind.NETWORK_3D.getValue()).isEqualTo(205);
     }
 
     @Test
     void mosaic_type_value_must_be_206() {
-        assertThat(DatasetType.Mosaic.getValue()).isEqualTo(206);
+        assertThat(DatasetKind.MOSAIC.getValue()).isEqualTo(206);
     }
 
     @Test
     void from_value_must_return_correct_enum_for_known_values() {
-        assertThat(DatasetType.fromValue(0)).isEqualTo(DatasetType.Tabular);
-        assertThat(DatasetType.fromValue(1)).isEqualTo(DatasetType.Point);
-        assertThat(DatasetType.fromValue(3)).isEqualTo(DatasetType.Line);
-        assertThat(DatasetType.fromValue(5)).isEqualTo(DatasetType.Region);
-        assertThat(DatasetType.fromValue(149)).isEqualTo(DatasetType.CAD);
-        assertThat(DatasetType.fromValue(101)).isEqualTo(DatasetType.PointZ);
-        assertThat(DatasetType.fromValue(103)).isEqualTo(DatasetType.LineZ);
-        assertThat(DatasetType.fromValue(105)).isEqualTo(DatasetType.RegionZ);
+        assertThat(DatasetKind.fromValue(0)).isEqualTo(DatasetKind.TABULAR);
+        assertThat(DatasetKind.fromValue(1)).isEqualTo(DatasetKind.POINT);
+        assertThat(DatasetKind.fromValue(3)).isEqualTo(DatasetKind.LINE);
+        assertThat(DatasetKind.fromValue(5)).isEqualTo(DatasetKind.REGION);
+        assertThat(DatasetKind.fromValue(149)).isEqualTo(DatasetKind.CAD);
+        assertThat(DatasetKind.fromValue(101)).isEqualTo(DatasetKind.POINT_Z);
+        assertThat(DatasetKind.fromValue(103)).isEqualTo(DatasetKind.LINE_Z);
+        assertThat(DatasetKind.fromValue(105)).isEqualTo(DatasetKind.REGION_Z);
     }
 
     @Test
     void from_value_must_throw_for_unknown_value() {
-        assertThatThrownBy(() -> DatasetType.fromValue(999))
+        assertThatThrownBy(() -> DatasetKind.fromValue(999))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("999");
     }

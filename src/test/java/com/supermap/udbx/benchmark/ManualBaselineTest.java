@@ -52,7 +52,7 @@ public class ManualBaselineTest {
             // 预热
             System.out.println("预热中...");
             for (int i = 0; i < 5; i++) {
-                dataset.getFeatures();
+                dataset.list();
             }
 
             // 测试读取 10K 要素
@@ -62,7 +62,7 @@ public class ManualBaselineTest {
 
             for (int i = 0; i < iterations; i++) {
                 long start = System.nanoTime();
-                List<PointFeature> features = dataset.getFeatures();
+                List<PointFeature> features = dataset.list();
                 long end = System.nanoTime();
 
                 long elapsedMs = (end - start) / 1_000_000;

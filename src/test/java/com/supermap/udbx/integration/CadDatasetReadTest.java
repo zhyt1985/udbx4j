@@ -97,7 +97,7 @@ class CadDatasetReadTest {
     void caddataset_getfeatures_must_return_92_features() {
         try (UdbxDataSource ds = UdbxDataSource.open(SAMPLE_DATA)) {
             CadDataset dataset = (CadDataset) ds.getDataset("CADDT");
-            List<CadFeature> features = dataset.getFeatures();
+            List<CadFeature> features = dataset.list();
             assertThat(features).hasSize(92);
         }
     }
@@ -107,9 +107,9 @@ class CadDatasetReadTest {
         try (UdbxDataSource ds = UdbxDataSource.open(SAMPLE_DATA)) {
             CadDataset dataset = (CadDataset) ds.getDataset("CADDT");
             // SmID=1 已知为 GeoLine（根据之前集成测试数据分布）
-            CadFeature feature = dataset.getFeature(1);
+            CadFeature feature = dataset.getById(1);
             assertThat(feature).isNotNull();
-            assertThat(feature.smId()).isEqualTo(1);
+            assertThat(feature.id()).isEqualTo(1);
             assertThat(feature.geometry()).isNotNull();
         }
     }
@@ -118,7 +118,7 @@ class CadDatasetReadTest {
     void caddataset_getfeature_nonexistent_must_return_null() {
         try (UdbxDataSource ds = UdbxDataSource.open(SAMPLE_DATA)) {
             CadDataset dataset = (CadDataset) ds.getDataset("CADDT");
-            CadFeature feature = dataset.getFeature(99999);
+            CadFeature feature = dataset.getById(99999);
             assertThat(feature).isNull();
         }
     }
@@ -127,7 +127,7 @@ class CadDatasetReadTest {
     void caddataset_features_must_have_4_geo_subtypes() {
         try (UdbxDataSource ds = UdbxDataSource.open(SAMPLE_DATA)) {
             CadDataset dataset = (CadDataset) ds.getDataset("CADDT");
-            List<CadFeature> features = dataset.getFeatures();
+            List<CadFeature> features = dataset.list();
 
             Map<String, Long> typeCounts = new HashMap<>();
             for (CadFeature f : features) {

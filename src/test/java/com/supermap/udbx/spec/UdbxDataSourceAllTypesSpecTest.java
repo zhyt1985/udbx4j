@@ -1,7 +1,7 @@
 package com.supermap.udbx.spec;
 
 import com.supermap.udbx.UdbxDataSource;
-import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.core.DatasetKind;
 import com.supermap.udbx.core.FieldInfo;
 import com.supermap.udbx.core.FieldType;
 import com.supermap.udbx.dataset.CadDataset;
@@ -258,14 +258,14 @@ class UdbxDataSourceAllTypesSpecTest {
         try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + path)) {
             SmRegisterDao dao = new SmRegisterDao(conn);
             assertThat(dao.findAll()).hasSize(8);
-            assertThat(dao.findByName("Pt").get().datasetType()).isEqualTo(DatasetType.Point);
-            assertThat(dao.findByName("PtZ").get().datasetType()).isEqualTo(DatasetType.PointZ);
-            assertThat(dao.findByName("Ln").get().datasetType()).isEqualTo(DatasetType.Line);
-            assertThat(dao.findByName("LnZ").get().datasetType()).isEqualTo(DatasetType.LineZ);
-            assertThat(dao.findByName("Rg").get().datasetType()).isEqualTo(DatasetType.Region);
-            assertThat(dao.findByName("RgZ").get().datasetType()).isEqualTo(DatasetType.RegionZ);
-            assertThat(dao.findByName("Tab").get().datasetType()).isEqualTo(DatasetType.Tabular);
-            assertThat(dao.findByName("Cad").get().datasetType()).isEqualTo(DatasetType.CAD);
+            assertThat(dao.findByName("Pt").get().kind()).isEqualTo(DatasetKind.POINT);
+            assertThat(dao.findByName("PtZ").get().kind()).isEqualTo(DatasetKind.POINT_Z);
+            assertThat(dao.findByName("Ln").get().kind()).isEqualTo(DatasetKind.LINE);
+            assertThat(dao.findByName("LnZ").get().kind()).isEqualTo(DatasetKind.LINE_Z);
+            assertThat(dao.findByName("Rg").get().kind()).isEqualTo(DatasetKind.REGION);
+            assertThat(dao.findByName("RgZ").get().kind()).isEqualTo(DatasetKind.REGION_Z);
+            assertThat(dao.findByName("Tab").get().kind()).isEqualTo(DatasetKind.TABULAR);
+            assertThat(dao.findByName("Cad").get().kind()).isEqualTo(DatasetKind.CAD);
         }
     }
 
@@ -275,8 +275,8 @@ class UdbxDataSourceAllTypesSpecTest {
     void create_point_dataset_with_fields_registers_fields_in_smfieldinfo(@TempDir Path tmpDir) throws Exception {
         String path = tmpDir.resolve("fields.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "Name", FieldType.NText, "名称", false),
-                new FieldInfo(0, "Value", FieldType.Double, "数值", false)
+                new FieldInfo(0, "Name", FieldType.NTEXT, "名称", false),
+                new FieldInfo(0, "Value", FieldType.DOUBLE, "数值", false)
         );
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             ds.createPointDataset("PtsWithFields", 4326, fields);
@@ -295,8 +295,8 @@ class UdbxDataSourceAllTypesSpecTest {
     void create_tabular_dataset_with_fields_creates_columns(@TempDir Path tmpDir) throws Exception {
         String path = tmpDir.resolve("tabfields.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "Code", FieldType.Int32, "编码", false),
-                new FieldInfo(0, "Label", FieldType.NText, "标签", false)
+                new FieldInfo(0, "Code", FieldType.INT32, "编码", false),
+                new FieldInfo(0, "Label", FieldType.NTEXT, "标签", false)
         );
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             ds.createTabularDataset("TabWithFields", fields);
@@ -315,7 +315,7 @@ class UdbxDataSourceAllTypesSpecTest {
     void create_cad_dataset_with_fields_registers_fields(@TempDir Path tmpDir) throws Exception {
         String path = tmpDir.resolve("cadfields.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "Layer", FieldType.NText, "图层", false)
+                new FieldInfo(0, "Layer", FieldType.NTEXT, "图层", false)
         );
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             ds.createCadDataset("CadWithFields", fields);

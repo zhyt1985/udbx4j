@@ -1,7 +1,7 @@
 package com.supermap.udbx.pool;
 
 import com.supermap.udbx.core.DatasetInfo;
-import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.core.DatasetKind;
 import com.supermap.udbx.dataset.*;
 import com.supermap.udbx.system.SmRegisterDao;
 import com.zaxxer.hikari.HikariConfig;
@@ -29,7 +29,7 @@ import java.util.function.Function;
  * <pre>{@code
  * try (UdbxDataSourcePool pool = new UdbxDataSourcePool("/path/to/data.udbx", 10)) {
  *     PointDataset dataset = pool.getDataset("BaseMap_P");
- *     List<PointFeature> features = dataset.getFeatures();
+ *     List<PointFeature> features = dataset.list();
  * }
  * }</pre>
  */
@@ -93,13 +93,13 @@ public class UdbxDataSourcePool implements AutoCloseable {
                 DatasetInfo info = dao.findByName(name)
                     .orElseThrow(() -> new IllegalArgumentException("数据集不存在: " + name));
 
-                return switch (info.datasetType()) {
-                    case Point -> new PointDataset(conn, info);
-                    case Line -> new LineDataset(conn, info);
-                    case Region -> new RegionDataset(conn, info);
-                    case Tabular -> new TabularDataset(conn, info);
+                return switch (info.kind()) {
+                    case POINT -> new PointDataset(conn, info);
+                    case LINE -> new LineDataset(conn, info);
+                    case REGION -> new RegionDataset(conn, info);
+                    case TABULAR -> new TabularDataset(conn, info);
                     default -> throw new UnsupportedOperationException(
-                        "不支持的数据集类型: " + info.datasetType());
+                        "不支持的数据集类型: " + info.kind());
                 };
             } catch (SQLException e) {
                 throw new RuntimeException("获取数据集失败: " + name, e);

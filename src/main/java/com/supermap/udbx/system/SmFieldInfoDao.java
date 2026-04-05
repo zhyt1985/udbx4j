@@ -97,9 +97,9 @@ public class SmFieldInfoDao {
                 "VALUES (?, ?, ?, ?, ?)";
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, field.datasetId());
-            stmt.setString(2, field.fieldName());
+            stmt.setString(2, field.name());
             stmt.setInt(3, field.fieldType().getValue());
-            stmt.setString(4, field.fieldAlias());
+            stmt.setString(4, field.alias());
             stmt.setInt(5, field.required() ? 1 : 0);
             stmt.executeUpdate();
         }
@@ -114,7 +114,7 @@ public class SmFieldInfoDao {
      */
     public void insertAll(int datasetId, List<FieldInfo> fields) throws SQLException {
         for (FieldInfo f : fields) {
-            insert(new FieldInfo(datasetId, f.fieldName(), f.fieldType(), f.fieldAlias(), f.required()));
+            insert(new FieldInfo(datasetId, f.name(), f.fieldType(), f.alias(), f.required()));
         }
     }
 }

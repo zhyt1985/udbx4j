@@ -4,8 +4,8 @@
 
 `udbx4j` 是超图 UDBX 空间数据格式的 Java 读写库。UDBX（Universal Spatial Database Extension）基于 SQLite 存储，支持矢量（点/线/面/CAD）和栅格空间数据。
 
-**当前版本**: v1.0.0（已发布到 Maven Central）
-**Maven 坐标**: `io.github.zhyt1985:udbx4j:1.0.0`
+**当前版本**: v2.0.0（已发布到 Maven Central）
+**Maven 坐标**: `io.github.zhyt1985:udbx4j:2.0.0`
 **发布日期**: 2025-03-25
 
 **白皮书：** `UDBX开放数据格式白皮书(V1.0).pdf`（项目根目录）
@@ -16,18 +16,18 @@
 
 ## 发布状态
 
-### v1.0.0（当前版本）
+### v2.0.0（当前版本）
 
-**发布日期**: 2025-03-25
+**发布日期**: 2026-04-04
 **Maven Central**: ✅ 已发布
-**GitHub Release**: https://github.com/zhyt1985/udbx4j/releases/tag/v1.0.0
+**GitHub Release**: https://github.com/zhyt1985/udbx4j/releases/tag/v2.0.0
 
 **使用方式**:
 ```xml
 <dependency>
     <groupId>io.github.zhyt1985</groupId>
     <artifactId>udbx4j</artifactId>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
 </dependency>
 ```
 
@@ -131,11 +131,12 @@ udbx4j/
     ├── main/java/com/supermap/udbx/
     │   ├── UdbxDataSource.java         # 入口类：open()/create()
     │   ├── core/                       # 枚举与元信息 POJO
-    │   │   ├── DatasetType.java        # Enum: Tabular=0, Point=1, Line=3...
+    │   │   ├── DatasetKind.java       # Enum: Tabular=0, Point=1, Line=3...
     │   │   ├── GeometryType.java       # Enum: GAIAPoint=1, GeoLine=3...
     │   │   ├── FieldType.java          # Enum: SuperMap 字段类型
     │   │   ├── FieldInfo.java          # 字段元信息
     │   │   └── DatasetInfo.java        # 数据集元信息（来自 SmRegister）
+    │   │   └── QueryOptions.java       # 查询选项（offset, limit, filter）
     │   ├── dataset/                    # 数据集实现
     │   │   ├── Dataset.java            # 抽象基类（AutoCloseable）
     │   │   ├── TabularDataset.java
@@ -143,11 +144,17 @@ udbx4j/
     │   │   ├── PointDataset.java
     │   │   ├── LineDataset.java
     │   │   ├── RegionDataset.java
+    │   │   ├── PointZDataset.java
+    │   │   ├── LineZDataset.java
+    │   │   ├── RegionZDataset.java
     │   │   └── CadDataset.java
     │   ├── geometry/
     │   │   ├── gaia/                   # SpatiaLite 二进制格式（点/线/面）
     │   │   │   ├── GaiaGeometryReader.java
     │   │   │   └── GaiaGeometryWriter.java
+    │   │   ├── geojson/                # GeoJSON-like 几何转换
+    │   │   │   ├── GeoJsonGeometry.java   # GeoJSON-like 几何模型
+    │   │   │   └── GeoJsonUtils.java      # JTS <-> GeoJSON-like 转换
     │   │   └── cad/                    # SuperMap 自定义二进制格式（CAD）
     │   │       ├── CadGeometryReader.java
     │   │       ├── CadGeometryWriter.java
@@ -193,9 +200,16 @@ udbx4j/
 geoType(int32) | styleSize(int32) | Style(...) | ...geometry data...
 ```
 
-### 数据集类型枚举
+### geometry.geojson 包
 
-| DatasetType | 枚举值 | Geometry 格式 |
+JTS 几何对象与 GeoJSON-like 模型之间的双向转换工具，用于跨语言数据交换：
+
+- **GeoJsonGeometry**：GeoJSON-like 几何模型（Point, MultiLineString, MultiPolygon），支持 UDBX 扩展字段（`srid`, `hasZ`, `bbox`）
+- **GeoJsonUtils**：JTS `Geometry` <-> `GeoJsonGeometry` 转换器，用于与 udbx4ts 等其他实现交换几何数据
+
+### DatasetKind 枚举
+
+| DatasetKind | 枚举值 | Geometry 格式 |
 |-------------|--------|---------------|
 | Tabular | 0 | 无 |
 | Point | 1 | GAIAPoint (geoType=1) |
@@ -250,7 +264,7 @@ geoType(int32) | styleSize(int32) | Style(...) | ...geometry data...
 **发布坐标**:
 - Group ID: `io.github.zhyt1985`
 - Artifact ID: `udbx4j`
-- Version: `1.0.0`（当前）
+- Version: `2.0.0`（当前）
 
 **发布命令**:
 ```bash
@@ -262,11 +276,11 @@ mvn clean verify
 mvn clean deploy
 
 # 4. 创建 Git 标签
-git tag -a v1.0.0 -m "Release v1.0.0"
-git push origin v1.0.0
+git tag -a v2.0.0 -m "Release v2.0.0"
+git push origin v2.0.0
 
 # 5. 创建 GitHub Release
-gh release create v1.0.0
+gh release create v2.0.0
 ```
 
 **Maven Central 管理**:
@@ -277,14 +291,14 @@ gh release create v1.0.0
 ### 版本策略
 
 遵循语义化版本（Semantic Versioning）：
-- `MAJOR.MINOR.PATCH`（如 1.0.0）
+- `MAJOR.MINOR.PATCH`（如 2.0.0）
 - MAJOR: 破坏性变更
 - MINOR: 新功能（向后兼容）
 - PATCH: Bug 修复
 
 ### 性能优化历史
 
-**v1.0.0 性能提升**:
+**v1.0.0 性能基线**（继承至 v2.0.0）:
 - Phase 0: 建立性能基线（4.516ms）
 - Phase 1: 基础优化（92.5% 提升，0.34ms）
 - Phase 2: 流式优化（分页查询 +22% 内存）
@@ -316,6 +330,18 @@ gh release create v1.0.0
 
 ---
 
-**项目状态**: 🎉 **v1.0.0 已发布，生产就绪**
-**最后更新**: 2025-03-25
+## udbx4spec 规范合规
+
+本项目严格遵循 `udbx4spec/` 中定义的跨语言规范。关键约束：
+
+- **API 命名**：所有公开 API 必须与 `udbx4spec/docs/01-naming-conventions.md` 对齐
+- **数据模型**：几何模型必须符合 `udbx4spec/docs/02-geometry-model.md`
+- **数据集类型**：`DatasetKind` 枚举值必须与 `udbx4spec/docs/03-dataset-taxonomy.md` 同步
+- **字段类型**：`FieldType` 枚举值必须与 `udbx4spec/docs/04-field-taxonomy.md` 同步（14 种）
+- **变更流程**：任何 API 变更、新增数据集类型或字段类型，必须先在 udbx4spec 中定义，然后在各语言实现中同步
+
+---
+
+**项目状态**: **v2.0.0 已发布，生产就绪**
+**最后更新**: 2026-04-04
 **维护者**: zhyt1985

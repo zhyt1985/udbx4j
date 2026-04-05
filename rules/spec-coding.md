@@ -93,7 +93,7 @@ void should_read_BaseMap_P_metadata_from_SmRegister() {
     try (UdbxDataSource ds = UdbxDataSource.open(SAMPLE_DB)) {
         DatasetInfo info = ds.getDatasetInfo("BaseMap_P");
 
-        assertThat(info.datasetType()).isEqualTo(DatasetType.Point);
+        assertThat(info.datasetKind()).isEqualTo(DatasetKind.Point);
         assertThat(info.objectCount()).isEqualTo(15);
         assertThat(info.srid()).isEqualTo(4326);
     }

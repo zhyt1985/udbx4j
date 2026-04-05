@@ -2,7 +2,7 @@ package com.supermap.udbx.integration;
 
 import com.supermap.udbx.UdbxDataSource;
 import com.supermap.udbx.core.DatasetInfo;
-import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.core.DatasetKind;
 import com.supermap.udbx.dataset.LineDataset;
 import com.supermap.udbx.dataset.PointDataset;
 import com.supermap.udbx.dataset.RegionDataset;
@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>验证针对真实文件的两类修复：
  * <ol>
  *   <li>幽灵表容错：SmRegister 中注册但物理表不存在的数据集，{@code getFeatures()} 应返回空列表而非抛异常。</li>
- *   <li>Text 类型降级：{@code DatasetType.Text} 数据集，{@code getDataset()} 应返回 {@code null} 而非崩溃。</li>
+ *   <li>Text 类型降级：{@code DatasetKind.TEXT} 数据集，{@code getDataset()} 应返回 {@code null} 而非崩溃。</li>
  * </ol>
  */
 @Tag("integration")
@@ -34,7 +34,7 @@ class HenanDatasetReadTest {
         try (UdbxDataSource ds = UdbxDataSource.open(FILE)) {
             PointDataset dataset = (PointDataset) ds.getDataset("居民地地名");
             assertThat(dataset).isNotNull();
-            assertThat(dataset.getFeatures()).isNotEmpty();
+            assertThat(dataset.list()).isNotEmpty();
         }
     }
 
@@ -43,7 +43,7 @@ class HenanDatasetReadTest {
         try (UdbxDataSource ds = UdbxDataSource.open(FILE)) {
             LineDataset dataset = (LineDataset) ds.getDataset("公路");
             assertThat(dataset).isNotNull();
-            assertThat(dataset.getFeatures()).isNotEmpty();
+            assertThat(dataset.list()).isNotEmpty();
         }
     }
 
@@ -52,7 +52,7 @@ class HenanDatasetReadTest {
         try (UdbxDataSource ds = UdbxDataSource.open(FILE)) {
             RegionDataset dataset = (RegionDataset) ds.getDataset("省级行政区划");
             assertThat(dataset).isNotNull();
-            assertThat(dataset.getFeatures()).isNotEmpty();
+            assertThat(dataset.list()).isNotEmpty();
         }
     }
 
@@ -64,8 +64,8 @@ class HenanDatasetReadTest {
             // "streetroad" 在 SmRegister 中注册但无对应物理表
             PointDataset dataset = (PointDataset) ds.getDataset("streetroad");
             assertThat(dataset).isNotNull();
-            assertThat(dataset.getFeatures())
-                    .as("幽灵表数据集 getFeatures() 应返回空列表")
+            assertThat(dataset.list())
+                    .as("幽灵表数据集 list() 应返回空列表")
                     .isEmpty();
         }
     }
@@ -76,8 +76,8 @@ class HenanDatasetReadTest {
             // "groad" 在 SmRegister 中注册但无对应物理表
             LineDataset dataset = (LineDataset) ds.getDataset("groad");
             assertThat(dataset).isNotNull();
-            assertThat(dataset.getFeatures())
-                    .as("幽灵表数据集 getFeatures() 应返回空列表")
+            assertThat(dataset.list())
+                    .as("幽灵表数据集 list() 应返回空列表")
                     .isEmpty();
         }
     }
@@ -88,8 +88,8 @@ class HenanDatasetReadTest {
             // "city" 在 SmRegister 中注册但无对应物理表
             RegionDataset dataset = (RegionDataset) ds.getDataset("city");
             assertThat(dataset).isNotNull();
-            assertThat(dataset.getFeatures())
-                    .as("幽灵表数据集 getFeatures() 应返回空列表")
+            assertThat(dataset.list())
+                    .as("幽灵表数据集 list() 应返回空列表")
                     .isEmpty();
         }
     }
@@ -99,26 +99,26 @@ class HenanDatasetReadTest {
     @Test
     void text_dataset_getDataset_returns_null() {
         try (UdbxDataSource ds = UdbxDataSource.open(FILE)) {
-            // DatasetType.Text 当前不支持，getDataset() 应返回 null 而非抛异常
+            // DatasetKind.TEXT 当前不支持，getDataset() 应返回 null 而非抛异常
             assertThat(ds.getDataset("河南省标签"))
                     .as("不支持的 Text 类型数据集应返回 null")
                     .isNull();
         }
     }
 
-    // ── 辅助验证：listDatasetInfos() 能正确枚举所有数据集 ────────────────────
+    // ── 辅助验证：listDatasets() 能正确枚举所有数据集 ────────────────────
 
     @Test
     void list_dataset_infos_includes_all_types() {
         try (UdbxDataSource ds = UdbxDataSource.open(FILE)) {
-            List<DatasetInfo> infos = ds.listDatasetInfos();
+            List<DatasetInfo> infos = ds.listDatasets();
             assertThat(infos).isNotEmpty();
             // 应包含 Text 类型数据集
             assertThat(infos)
-                    .anyMatch(i -> i.datasetType() == DatasetType.Text)
-                    .anyMatch(i -> i.datasetType() == DatasetType.Point)
-                    .anyMatch(i -> i.datasetType() == DatasetType.Line)
-                    .anyMatch(i -> i.datasetType() == DatasetType.Region);
+                    .anyMatch(i -> i.kind() == DatasetKind.TEXT)
+                    .anyMatch(i -> i.kind() == DatasetKind.POINT)
+                    .anyMatch(i -> i.kind() == DatasetKind.LINE)
+                    .anyMatch(i -> i.kind() == DatasetKind.REGION);
         }
     }
 }

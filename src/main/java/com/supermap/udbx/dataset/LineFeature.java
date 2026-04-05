@@ -8,15 +8,15 @@ import java.util.Objects;
 /**
  * 线数据集要素（不可变 Record）。
  *
- * <p>包含 SmID、MultiLineString 几何体和用户属性字段。
+ * <p>包含 id（对应 SmID）、MultiLineString 几何体和用户属性字段。
  * 对应白皮书 §3.1.3（线数据集记录结构）。
  *
- * @param smId       SmID —— 要素唯一 ID（系统字段）
+ * @param id         要素唯一 ID（对应 SmID）
  * @param geometry   JTS MultiLineString 几何对象（SRID 已由 GaiaGeometryReader 设置）
  * @param attributes 用户属性字段（字段名 → 字段值），不可变视图
  */
 public record LineFeature(
-        int smId,
+        int id,
         MultiLineString geometry,
         Map<String, Object> attributes
 ) {

@@ -38,7 +38,7 @@ public class Phase1PerformanceTest {
 
                 // 预热 JVM
                 for (int i = 0; i < 5; i++) {
-                    pointDataset.getFeatures();
+                    pointDataset.list();
                 }
 
                 // 正式测量
@@ -47,7 +47,7 @@ public class Phase1PerformanceTest {
 
                 for (int i = 0; i < iterations; i++) {
                     long start = System.nanoTime();
-                    List<PointFeature> features = pointDataset.getFeatures();
+                    List<PointFeature> features = pointDataset.list();
                     long elapsed = System.nanoTime() - start;
                     totalElapsed += elapsed;
 

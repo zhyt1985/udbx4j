@@ -1,7 +1,9 @@
 package com.supermap.udbx.benchmark;
 
 import com.supermap.udbx.UdbxDataSource;
+import com.supermap.udbx.core.QueryOptions;
 import com.supermap.udbx.dataset.PointDataset;
+import com.supermap.udbx.dataset.PointFeature;
 import com.supermap.udbx.streaming.AutoCloseableStream;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -10,6 +12,7 @@ import org.openjdk.jmh.annotations.*;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -40,7 +43,7 @@ public class StreamingReadBenchmark {
                     116.0 + (i % 1000) * 0.001,
                     39.0 + (i / 1000) * 0.001
                 ));
-                pd.addFeature(i + 1, point, null);
+                pd.insert(new PointFeature(i + 1, point, Map.of()));
             }
         }
     }
@@ -48,7 +51,7 @@ public class StreamingReadBenchmark {
     @Benchmark
     public long streamRead100KPoints() {
         try (UdbxDataSource ds = UdbxDataSource.open(testFile.toString());
-             AutoCloseableStream<?> stream = ds.getDataset("points").streamFeatures()) {
+             AutoCloseableStream<?> stream = ds.getDataset("points").stream()) {
             return stream.getStream().count();
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -59,7 +62,7 @@ public class StreamingReadBenchmark {
     public int batchRead100KPoints() {
         try (UdbxDataSource ds = UdbxDataSource.open(testFile.toString());
              PointDataset pd = (PointDataset) ds.getDataset("points")) {
-            return pd.getFeatures().size();
+            return pd.list().size();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -73,7 +76,7 @@ public class StreamingReadBenchmark {
             int pageSize = 1000;
             int offset = 0;
             while (true) {
-                var batch = pd.getFeatures(offset, pageSize);
+                var batch = pd.list(new QueryOptions(null, pageSize, offset));
                 if (batch.isEmpty()) break;
                 totalCount += batch.size();
                 offset += pageSize;

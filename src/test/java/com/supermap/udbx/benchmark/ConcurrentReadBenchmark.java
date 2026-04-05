@@ -2,6 +2,7 @@ package com.supermap.udbx.benchmark;
 
 import com.supermap.udbx.UdbxDataSource;
 import com.supermap.udbx.dataset.PointDataset;
+import com.supermap.udbx.dataset.PointFeature;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
@@ -55,7 +56,7 @@ public class ConcurrentReadBenchmark {
                 for (int i = 0; i < count; i++) {
                     Point p = GEOM_FACTORY.createPoint(
                         new Coordinate(116.0 + i * 0.0001, 39.0 + i * 0.0001));
-                    pd.addFeature(i + 1, p, Map.of());
+                    pd.insert(new PointFeature(i + 1, p, Map.of()));
                 }
             }
         }
@@ -70,7 +71,7 @@ public class ConcurrentReadBenchmark {
     public int singleThreadRead(ConcurrentState state) {
         try (UdbxDataSource ds = UdbxDataSource.open(state.testFile.toString())) {
             PointDataset dataset = (PointDataset) ds.getDataset("points");
-            List<?> features = dataset.getFeatures();
+            List<?> features = dataset.list();
             return features.size();
         } catch (Exception e) {
             throw new RuntimeException("Single thread read failed", e);
@@ -123,7 +124,7 @@ public class ConcurrentReadBenchmark {
     private int readInThread(Path file) {
         try (UdbxDataSource ds = UdbxDataSource.open(file.toString())) {
             PointDataset dataset = (PointDataset) ds.getDataset("points");
-            List<?> features = dataset.getFeatures();
+            List<?> features = dataset.list();
             return features.size();
         } catch (Exception e) {
             // 记录错误但不中断其他线程

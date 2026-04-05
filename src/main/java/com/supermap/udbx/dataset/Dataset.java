@@ -1,7 +1,8 @@
 package com.supermap.udbx.dataset;
 
 import com.supermap.udbx.core.DatasetInfo;
-import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.core.DatasetKind;
+import com.supermap.udbx.core.QueryOptions;
 import com.supermap.udbx.streaming.AutoCloseableStream;
 
 import java.sql.Connection;
@@ -37,14 +38,14 @@ public abstract class Dataset implements AutoCloseable {
      * 返回数据集名称（SmDatasetName）。
      */
     public String getName() {
-        return info.datasetName();
+        return info.name();
     }
 
     /**
-     * 返回数据集类型（SmDatasetType）。
+     * 返回数据集类型（SmDatasetKind）。
      */
-    public DatasetType getType() {
-        return info.datasetType();
+    public DatasetKind getKind() {
+        return info.kind();
     }
 
     /**
@@ -64,8 +65,8 @@ public abstract class Dataset implements AutoCloseable {
     /**
      * 返回数据集 ID（SmDatasetID）。
      */
-    public int getDatasetId() {
-        return info.datasetId();
+    public int getId() {
+        return info.id();
     }
 
     /**
@@ -88,7 +89,7 @@ public abstract class Dataset implements AutoCloseable {
     protected boolean tableExists() {
         try (PreparedStatement ps = conn.prepareStatement(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?")) {
-            ps.setString(1, info.datasetName());
+            ps.setString(1, info.name());
             return ps.executeQuery().next();
         } catch (SQLException e) {
             return false;
@@ -101,18 +102,28 @@ public abstract class Dataset implements AutoCloseable {
      * <p>返回一个可自动关闭的 Stream，避免一次性加载所有数据到内存。
      * 使用 try-with-resources 确保资源释放：
      * <pre>{@code
-     * try (var stream = dataset.streamFeatures()) {
+     * try (var stream = dataset.stream()) {
      *     stream.getStream().forEach(feature -> process(feature));
      * }
      * }</pre>
      *
      * <p>默认实现抛出 UnsupportedOperationException，子类可覆盖以支持流式读取。
      *
+     * @param options 查询选项（可为 null 表示读取全部）
      * @return 包装了 Stream 和资源的 AutoCloseableStream
      * @throws UnsupportedOperationException 若子类未实现此方法
      */
-    public AutoCloseableStream<?> streamFeatures() {
+    public AutoCloseableStream<?> stream(QueryOptions options) {
         throw new UnsupportedOperationException(
-            "streamFeatures() 不支持 " + getType() + " 类型数据集");
+            "stream() 不支持 " + getKind() + " 类型数据集");
+    }
+
+    /**
+     * 流式读取数据集全部要素（便捷重载）。
+     *
+     * @return 包装了 Stream 和资源的 AutoCloseableStream
+     */
+    public AutoCloseableStream<?> stream() {
+        return stream(QueryOptions.EMPTY);
     }
 }

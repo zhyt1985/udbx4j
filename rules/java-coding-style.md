@@ -27,7 +27,7 @@ public record DatasetInfo(
     int datasetId,
     String datasetName,
     String tableName,
-    DatasetType datasetType,
+    DatasetKind datasetKind,
     int objectCount,
     double left, double right, double top, double bottom,
     int srid

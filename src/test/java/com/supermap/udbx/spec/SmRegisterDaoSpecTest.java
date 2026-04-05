@@ -1,7 +1,7 @@
 package com.supermap.udbx.spec;
 
 import com.supermap.udbx.core.DatasetInfo;
-import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.core.DatasetKind;
 import com.supermap.udbx.system.SmRegisterDao;
 import org.junit.jupiter.api.Test;
 
@@ -21,10 +21,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>测试数据（SampleData.udbx 中的已知记录）：
  * <pre>
- *   BaseMap_P:  DatasetType=1 (Point),  ObjectCount=15, SRID=4326
- *   BaseMap_L:  DatasetType=3 (Line),   ObjectCount=47, SRID=4326
- *   BaseMap_R:  DatasetType=5 (Region), ObjectCount=15, SRID=4326
- *   CADDT:      DatasetType=149 (CAD),  ObjectCount=92, SRID=0
+ *   BaseMap_P:  DatasetKind=1 (Point),  ObjectCount=15, SRID=4326
+ *   BaseMap_L:  DatasetKind=3 (Line),   ObjectCount=47, SRID=4326
+ *   BaseMap_R:  DatasetKind=5 (Region), ObjectCount=15, SRID=4326
+ *   CADDT:      DatasetKind=149 (CAD),  ObjectCount=92, SRID=0
  * </pre>
  */
 class SmRegisterDaoSpecTest {
@@ -52,9 +52,9 @@ class SmRegisterDaoSpecTest {
 
             assertThat(result).isPresent();
             DatasetInfo info = result.get();
-            assertThat(info.datasetId()).isEqualTo(1);
-            assertThat(info.datasetName()).isEqualTo("BaseMap_P");
-            assertThat(info.datasetType()).isEqualTo(DatasetType.Point);
+            assertThat(info.id()).isEqualTo(1);
+            assertThat(info.name()).isEqualTo("BaseMap_P");
+            assertThat(info.kind()).isEqualTo(DatasetKind.POINT);
             assertThat(info.objectCount()).isEqualTo(15);
             assertThat(info.srid()).isEqualTo(4326);
         }
@@ -69,9 +69,9 @@ class SmRegisterDaoSpecTest {
 
             assertThat(result).isPresent();
             DatasetInfo info = result.get();
-            assertThat(info.datasetId()).isEqualTo(2);
-            assertThat(info.datasetName()).isEqualTo("BaseMap_L");
-            assertThat(info.datasetType()).isEqualTo(DatasetType.Line);
+            assertThat(info.id()).isEqualTo(2);
+            assertThat(info.name()).isEqualTo("BaseMap_L");
+            assertThat(info.kind()).isEqualTo(DatasetKind.LINE);
             assertThat(info.objectCount()).isEqualTo(47);
             assertThat(info.srid()).isEqualTo(4326);
         }
@@ -86,9 +86,9 @@ class SmRegisterDaoSpecTest {
 
             assertThat(result).isPresent();
             DatasetInfo info = result.get();
-            assertThat(info.datasetId()).isEqualTo(3);
-            assertThat(info.datasetName()).isEqualTo("BaseMap_R");
-            assertThat(info.datasetType()).isEqualTo(DatasetType.Region);
+            assertThat(info.id()).isEqualTo(3);
+            assertThat(info.name()).isEqualTo("BaseMap_R");
+            assertThat(info.kind()).isEqualTo(DatasetKind.REGION);
             assertThat(info.objectCount()).isEqualTo(15);
             assertThat(info.srid()).isEqualTo(4326);
         }
@@ -103,9 +103,9 @@ class SmRegisterDaoSpecTest {
 
             assertThat(result).isPresent();
             DatasetInfo info = result.get();
-            assertThat(info.datasetId()).isEqualTo(9);
-            assertThat(info.datasetName()).isEqualTo("CADDT");
-            assertThat(info.datasetType()).isEqualTo(DatasetType.CAD);
+            assertThat(info.id()).isEqualTo(9);
+            assertThat(info.name()).isEqualTo("CADDT");
+            assertThat(info.kind()).isEqualTo(DatasetKind.CAD);
             assertThat(info.objectCount()).isEqualTo(92);
             assertThat(info.srid()).isEqualTo(0);
         }
@@ -119,7 +119,7 @@ class SmRegisterDaoSpecTest {
             Optional<DatasetInfo> result = dao.findById(1);
 
             assertThat(result).isPresent();
-            assertThat(result.get().datasetName()).isEqualTo("BaseMap_P");
+            assertThat(result.get().name()).isEqualTo("BaseMap_P");
         }
     }
 
@@ -154,7 +154,7 @@ class SmRegisterDaoSpecTest {
 
             assertThat(result).isPresent();
             DatasetInfo info = result.get();
-            assertThat(info.datasetType()).isEqualTo(DatasetType.Tabular);
+            assertThat(info.kind()).isEqualTo(DatasetKind.TABULAR);
             assertThat(info.srid()).isEqualTo(0);
         }
     }
@@ -168,7 +168,7 @@ class SmRegisterDaoSpecTest {
 
             assertThat(result).isPresent();
             DatasetInfo info = result.get();
-            assertThat(info.datasetType()).isEqualTo(DatasetType.PointZ);
+            assertThat(info.kind()).isEqualTo(DatasetKind.POINT_Z);
             assertThat(info.objectCount()).isEqualTo(15);
         }
     }

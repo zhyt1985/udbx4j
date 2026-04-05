@@ -47,7 +47,7 @@ class DatasetWriteTest {
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointDataset pd = ds.createPointDataset("TestPoints", 4326);
             for (int i = 1; i <= 5; i++) {
-                pd.addFeature(i, GF.createPoint(new Coordinate(i * 10.0, i * 5.0)), Map.of());
+                pd.insert(new PointFeature(i, GF.createPoint(new Coordinate(i * 10.0, i * 5.0)), Map.of()));
             }
         }
 
@@ -56,7 +56,7 @@ class DatasetWriteTest {
             PointDataset pd = (PointDataset) ds.getDataset("TestPoints");
             assertThat(pd.getObjectCount()).isEqualTo(5);
 
-            List<PointFeature> features = pd.getFeatures();
+            List<PointFeature> features = pd.list();
             assertThat(features).hasSize(5);
             assertThat(features.get(0).geometry().getX()).isCloseTo(10.0, offset(1e-9));
             assertThat(features.get(0).geometry().getY()).isCloseTo(5.0, offset(1e-9));
@@ -70,14 +70,14 @@ class DatasetWriteTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointDataset pd = ds.createPointDataset("PtDs", 4326);
-            pd.addFeature(42, GF.createPoint(new Coordinate(1.0, 2.0)), Map.of());
-            pd.addFeature(100, GF.createPoint(new Coordinate(3.0, 4.0)), Map.of());
+            pd.insert(new PointFeature(42, GF.createPoint(new Coordinate(1.0, 2.0)), Map.of()));
+            pd.insert(new PointFeature(100, GF.createPoint(new Coordinate(3.0, 4.0)), Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             PointDataset pd = (PointDataset) ds.getDataset("PtDs");
             assertThat(pd.getObjectCount()).isEqualTo(2);
-            PointFeature f = pd.getFeature(42);
+            PointFeature f = pd.getById(42);
             assertThat(f).isNotNull();
             assertThat(f.geometry().getX()).isCloseTo(1.0, offset(1e-9));
         }
@@ -97,15 +97,15 @@ class DatasetWriteTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineDataset ld = ds.createLineDataset("TestLines", 4326);
-            ld.addFeature(1, mls, Map.of());
-            ld.addFeature(2, mls, Map.of());
-            ld.addFeature(3, mls, Map.of());
+            ld.insert(new LineFeature(1, mls, Map.of()));
+            ld.insert(new LineFeature(2, mls, Map.of()));
+            ld.insert(new LineFeature(3, mls, Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             LineDataset ld = (LineDataset) ds.getDataset("TestLines");
             assertThat(ld.getObjectCount()).isEqualTo(3);
-            List<LineFeature> features = ld.getFeatures();
+            List<LineFeature> features = ld.list();
             assertThat(features).hasSize(3);
         }
     }
@@ -126,14 +126,14 @@ class DatasetWriteTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionDataset rd = ds.createRegionDataset("TestRegions", 4326);
-            rd.addFeature(1, mp, Map.of());
-            rd.addFeature(2, mp, Map.of());
+            rd.insert(new RegionFeature(1, mp, Map.of()));
+            rd.insert(new RegionFeature(2, mp, Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             RegionDataset rd = (RegionDataset) ds.getDataset("TestRegions");
             assertThat(rd.getObjectCount()).isEqualTo(2);
-            List<RegionFeature> features = rd.getFeatures();
+            List<RegionFeature> features = rd.list();
             assertThat(features).hasSize(2);
         }
     }
@@ -146,16 +146,16 @@ class DatasetWriteTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             TabularDataset td = ds.createTabularDataset("TestTable");
-            td.addRow(1, Map.of());
-            td.addRow(2, Map.of());
-            td.addRow(3, Map.of());
-            td.addRow(4, Map.of());
+            td.insert(new TabularRecord(1, Map.of()));
+            td.insert(new TabularRecord(2, Map.of()));
+            td.insert(new TabularRecord(3, Map.of()));
+            td.insert(new TabularRecord(4, Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             TabularDataset td = (TabularDataset) ds.getDataset("TestTable");
             assertThat(td.getObjectCount()).isEqualTo(4);
-            List<TabularRecord> records = td.getRecords();
+            List<TabularRecord> records = td.list();
             assertThat(records).hasSize(4);
         }
     }
@@ -166,25 +166,25 @@ class DatasetWriteTest {
     void point_dataset_with_user_fields_preserves_attributes(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("attrs.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "NAME", FieldType.NText, "名称", false),
-                new FieldInfo(0, "VALUE", FieldType.Double, "数值", false)
+                new FieldInfo(0, "NAME", FieldType.NTEXT, "名称", false),
+                new FieldInfo(0, "VALUE", FieldType.DOUBLE, "数值", false)
         );
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointDataset pd = ds.createPointDataset("PtAttrs", 4326, fields);
-            pd.addFeature(1, GF.createPoint(new Coordinate(10.0, 20.0)),
-                    Map.of("NAME", "Beijing", "VALUE", 42.5));
-            pd.addFeature(2, GF.createPoint(new Coordinate(11.0, 21.0)),
-                    Map.of("NAME", "Shanghai", "VALUE", 99.0));
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(10.0, 20.0)),
+                    Map.of("NAME", "Beijing", "VALUE", 42.5)));
+            pd.insert(new PointFeature(2, GF.createPoint(new Coordinate(11.0, 21.0)),
+                    Map.of("NAME", "Shanghai", "VALUE", 99.0)));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             PointDataset pd = (PointDataset) ds.getDataset("PtAttrs");
-            PointFeature f1 = pd.getFeature(1);
+            PointFeature f1 = pd.getById(1);
             assertThat(f1.attributes()).containsEntry("NAME", "Beijing");
             assertThat(f1.attributes()).containsKey("VALUE");
 
-            List<PointFeature> all = pd.getFeatures();
+            List<PointFeature> all = pd.list();
             assertThat(all).hasSize(2);
             assertThat(all.get(1).attributes()).containsEntry("NAME", "Shanghai");
         }
@@ -194,19 +194,19 @@ class DatasetWriteTest {
     void tabular_dataset_with_user_fields_preserves_attributes(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("tabular_attrs.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "CITY", FieldType.NText, "城市", false),
-                new FieldInfo(0, "POP", FieldType.Int32, "人口", false)
+                new FieldInfo(0, "CITY", FieldType.NTEXT, "城市", false),
+                new FieldInfo(0, "POP", FieldType.INT32, "人口", false)
         );
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             TabularDataset td = ds.createTabularDataset("CityTable", fields);
-            td.addRow(1, Map.of("CITY", "Beijing", "POP", 21893095));
-            td.addRow(2, Map.of("CITY", "Shanghai", "POP", 24870895));
+            td.insert(new TabularRecord(1, Map.of("CITY", "Beijing", "POP", 21893095)));
+            td.insert(new TabularRecord(2, Map.of("CITY", "Shanghai", "POP", 24870895)));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             TabularDataset td = (TabularDataset) ds.getDataset("CityTable");
-            List<TabularRecord> records = td.getRecords();
+            List<TabularRecord> records = td.list();
             assertThat(records).hasSize(2);
             assertThat(records.get(0).attributes()).containsEntry("CITY", "Beijing");
             assertThat(records.get(1).attributes()).containsEntry("CITY", "Shanghai");

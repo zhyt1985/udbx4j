@@ -73,7 +73,7 @@ public class BaselineBenchmark {
                 for (int i = 0; i < count; i++) {
                     Point p = GEOM_FACTORY.createPoint(
                         new Coordinate(116.0 + i * 0.0001, 39.0 + i * 0.0001));
-                    pd.addFeature(i + 1, p, Map.of());
+                    pd.insert(new PointFeature(i + 1, p, Map.of()));
                 }
             }
         }
@@ -81,7 +81,7 @@ public class BaselineBenchmark {
 
     @Benchmark
     public List<PointFeature> baselineRead10KPoints(DataSetState state) {
-        return state.dataset.getFeatures();
+        return state.dataset.list();
     }
 
     @Benchmark

@@ -86,11 +86,11 @@ class Dataset2DSpecTest {
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionDataset rd = ds.createRegionDataset("Regions", 4326);
             MultiPolygon geom = buildMultiPolygon(0.0, 0.0, 1.0, 1.0);
-            rd.addFeature(1, geom, Map.of());
+            rd.insert(new RegionFeature(1, geom, Map.of()));
 
-            List<RegionFeature> features = rd.getFeatures();
+            List<RegionFeature> features = rd.list();
             assertThat(features).hasSize(1);
-            assertThat(features.get(0).smId()).isEqualTo(1);
+            assertThat(features.get(0).id()).isEqualTo(1);
             assertThat(features.get(0).geometry()).isNotNull();
             assertThat(features.get(0).geometry().getNumGeometries()).isEqualTo(1);
         }
@@ -103,11 +103,11 @@ class Dataset2DSpecTest {
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionDataset rd = ds.createRegionDataset("Regions", 4326);
             MultiPolygon geom = buildMultiPolygon(10.0, 20.0, 30.0, 40.0);
-            rd.addFeature(1, geom, Map.of());
+            rd.insert(new RegionFeature(1, geom, Map.of()));
 
-            RegionFeature f = rd.getFeature(1);
+            RegionFeature f = rd.getById(1);
             assertThat(f).isNotNull();
-            assertThat(f.smId()).isEqualTo(1);
+            assertThat(f.id()).isEqualTo(1);
 
             Polygon poly = (Polygon) f.geometry().getGeometryN(0);
             Coordinate[] coords = poly.getExteriorRing().getCoordinates();
@@ -123,7 +123,7 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionDataset rd = ds.createRegionDataset("Regions", 4326);
-            assertThat(rd.getFeature(999)).isNull();
+            assertThat(rd.getById(999)).isNull();
         }
     }
 
@@ -133,16 +133,16 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionDataset rd = ds.createRegionDataset("Regions", 4326);
-            rd.addFeature(1, buildMultiPolygon(0, 0, 1, 1), Map.of());
-            rd.addFeature(2, buildMultiPolygon(2, 2, 3, 3), Map.of());
+            rd.insert(new RegionFeature(1, buildMultiPolygon(0, 0, 1, 1), Map.of()));
+            rd.insert(new RegionFeature(2, buildMultiPolygon(2, 2, 3, 3), Map.of()));
 
-            assertThat(rd.getFeatures()).hasSize(2);
+            assertThat(rd.list()).hasSize(2);
 
-            rd.deleteFeature(1);
+            rd.delete(1);
 
-            assertThat(rd.getFeatures()).hasSize(1);
-            assertThat(rd.getFeature(1)).isNull();
-            assertThat(rd.getFeature(2)).isNotNull();
+            assertThat(rd.list()).hasSize(1);
+            assertThat(rd.getById(1)).isNull();
+            assertThat(rd.getById(2)).isNotNull();
         }
 
         // 重新打开验证 ObjectCount 已递减
@@ -158,9 +158,9 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionDataset rd = ds.createRegionDataset("Regions", 4326);
-            rd.addFeature(1, buildMultiPolygon(0, 0, 1, 1), Map.of());
+            rd.insert(new RegionFeature(1, buildMultiPolygon(0, 0, 1, 1), Map.of()));
 
-            assertThatThrownBy(() -> rd.deleteFeature(999))
+            assertThatThrownBy(() -> rd.delete(999))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
         }
@@ -170,19 +170,19 @@ class Dataset2DSpecTest {
     void region_updateFeature_should_change_geometry_and_attributes(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("region_update.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "NAME", FieldType.NText, "名称", false)
+                new FieldInfo(0, "NAME", FieldType.NTEXT, "名称", false)
         );
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionDataset rd = ds.createRegionDataset("Regions", 4326, fields);
-            rd.addFeature(1, buildMultiPolygon(0, 0, 1, 1), Map.of("NAME", "OldName"));
+            rd.insert(new RegionFeature(1, buildMultiPolygon(0, 0, 1, 1), Map.of("NAME", "OldName")));
 
-            rd.updateFeature(1, buildMultiPolygon(5, 5, 10, 10), Map.of("NAME", "NewName"));
+            rd.update(1, buildMultiPolygon(5, 5, 10, 10), Map.of("NAME", "NewName"));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             RegionDataset rd = (RegionDataset) ds.getDataset("Regions");
-            RegionFeature f = rd.getFeature(1);
+            RegionFeature f = rd.getById(1);
             assertThat(f).isNotNull();
 
             Polygon poly = (Polygon) f.geometry().getGeometryN(0);
@@ -200,9 +200,9 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionDataset rd = ds.createRegionDataset("Regions", 4326);
-            rd.addFeature(1, buildMultiPolygon(0, 0, 1, 1), Map.of());
+            rd.insert(new RegionFeature(1, buildMultiPolygon(0, 0, 1, 1), Map.of()));
 
-            assertThatThrownBy(() -> rd.updateFeature(999, buildMultiPolygon(0, 0, 1, 1), Map.of()))
+            assertThatThrownBy(() -> rd.update(999, buildMultiPolygon(0, 0, 1, 1), Map.of()))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
         }
@@ -212,19 +212,19 @@ class Dataset2DSpecTest {
     void region_addFeature_with_attributes_should_persist(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("region_attr.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "AREA", FieldType.Double, "面积", false),
-                new FieldInfo(0, "LABEL", FieldType.NText, "标签", false)
+                new FieldInfo(0, "AREA", FieldType.DOUBLE, "面积", false),
+                new FieldInfo(0, "LABEL", FieldType.NTEXT, "标签", false)
         );
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionDataset rd = ds.createRegionDataset("Regions", 4326, fields);
-            rd.addFeature(1, buildMultiPolygon(0, 0, 1, 1),
-                    Map.of("AREA", 1.5, "LABEL", "TestArea"));
+            rd.insert(new RegionFeature(1, buildMultiPolygon(0, 0, 1, 1),
+                    Map.of("AREA", 1.5, "LABEL", "TestArea")));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             RegionDataset rd = (RegionDataset) ds.getDataset("Regions");
-            RegionFeature f = rd.getFeature(1);
+            RegionFeature f = rd.getById(1);
             assertThat(f.attributes()).containsEntry("LABEL", "TestArea");
         }
     }
@@ -238,11 +238,11 @@ class Dataset2DSpecTest {
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineDataset ld = ds.createLineDataset("Lines", 4326);
             MultiLineString geom = buildMultiLineString(0.0, 0.0, 1.0, 1.0);
-            ld.addFeature(1, geom, Map.of());
+            ld.insert(new LineFeature(1, geom, Map.of()));
 
-            List<LineFeature> features = ld.getFeatures();
+            List<LineFeature> features = ld.list();
             assertThat(features).hasSize(1);
-            assertThat(features.get(0).smId()).isEqualTo(1);
+            assertThat(features.get(0).id()).isEqualTo(1);
             assertThat(features.get(0).geometry()).isNotNull();
         }
     }
@@ -254,11 +254,11 @@ class Dataset2DSpecTest {
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineDataset ld = ds.createLineDataset("Lines", 4326);
             MultiLineString geom = buildMultiLineString(1.0, 2.0, 3.0, 4.0);
-            ld.addFeature(1, geom, Map.of());
+            ld.insert(new LineFeature(1, geom, Map.of()));
 
-            LineFeature f = ld.getFeature(1);
+            LineFeature f = ld.getById(1);
             assertThat(f).isNotNull();
-            assertThat(f.smId()).isEqualTo(1);
+            assertThat(f.id()).isEqualTo(1);
 
             // 验证 MultiLineString 坐标
             LineString ls = (LineString) f.geometry().getGeometryN(0);
@@ -276,7 +276,7 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineDataset ld = ds.createLineDataset("Lines", 4326);
-            assertThat(ld.getFeature(999)).isNull();
+            assertThat(ld.getById(999)).isNull();
         }
     }
 
@@ -286,16 +286,16 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineDataset ld = ds.createLineDataset("Lines", 4326);
-            ld.addFeature(1, buildMultiLineString(0, 0, 1, 1), Map.of());
-            ld.addFeature(2, buildMultiLineString(2, 2, 3, 3), Map.of());
+            ld.insert(new LineFeature(1, buildMultiLineString(0, 0, 1, 1), Map.of()));
+            ld.insert(new LineFeature(2, buildMultiLineString(2, 2, 3, 3), Map.of()));
 
-            assertThat(ld.getFeatures()).hasSize(2);
+            assertThat(ld.list()).hasSize(2);
 
-            ld.deleteFeature(1);
+            ld.delete(1);
 
-            assertThat(ld.getFeatures()).hasSize(1);
-            assertThat(ld.getFeature(1)).isNull();
-            assertThat(ld.getFeature(2)).isNotNull();
+            assertThat(ld.list()).hasSize(1);
+            assertThat(ld.getById(1)).isNull();
+            assertThat(ld.getById(2)).isNotNull();
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
@@ -310,9 +310,9 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineDataset ld = ds.createLineDataset("Lines", 4326);
-            ld.addFeature(1, buildMultiLineString(0, 0, 1, 1), Map.of());
+            ld.insert(new LineFeature(1, buildMultiLineString(0, 0, 1, 1), Map.of()));
 
-            assertThatThrownBy(() -> ld.deleteFeature(999))
+            assertThatThrownBy(() -> ld.delete(999))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
         }
@@ -324,14 +324,14 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineDataset ld = ds.createLineDataset("Lines", 4326);
-            ld.addFeature(1, buildMultiLineString(0, 0, 1, 1), Map.of());
+            ld.insert(new LineFeature(1, buildMultiLineString(0, 0, 1, 1), Map.of()));
 
-            ld.updateFeature(1, buildMultiLineString(5, 6, 7, 8), Map.of());
+            ld.update(1, buildMultiLineString(5, 6, 7, 8), Map.of());
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             LineDataset ld = (LineDataset) ds.getDataset("Lines");
-            LineFeature f = ld.getFeature(1);
+            LineFeature f = ld.getById(1);
             assertThat(f).isNotNull();
 
             LineString ls = (LineString) f.geometry().getGeometryN(0);
@@ -347,19 +347,19 @@ class Dataset2DSpecTest {
     void line_updateFeature_with_attributes_should_persist(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("line_update_attr.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "ROAD", FieldType.NText, "道路名", false)
+                new FieldInfo(0, "ROAD", FieldType.NTEXT, "道路名", false)
         );
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineDataset ld = ds.createLineDataset("Lines", 4326, fields);
-            ld.addFeature(1, buildMultiLineString(0, 0, 1, 1), Map.of("ROAD", "OldRoad"));
+            ld.insert(new LineFeature(1, buildMultiLineString(0, 0, 1, 1), Map.of("ROAD", "OldRoad")));
 
-            ld.updateFeature(1, null, Map.of("ROAD", "NewRoad"));
+            ld.update(1, null, Map.of("ROAD", "NewRoad"));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             LineDataset ld = (LineDataset) ds.getDataset("Lines");
-            LineFeature f = ld.getFeature(1);
+            LineFeature f = ld.getById(1);
             assertThat(f.attributes()).containsEntry("ROAD", "NewRoad");
         }
     }
@@ -370,9 +370,9 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineDataset ld = ds.createLineDataset("Lines", 4326);
-            ld.addFeature(1, buildMultiLineString(0, 0, 1, 1), Map.of());
+            ld.insert(new LineFeature(1, buildMultiLineString(0, 0, 1, 1), Map.of()));
 
-            assertThatThrownBy(() -> ld.updateFeature(999, buildMultiLineString(0, 0, 1, 1), Map.of()))
+            assertThatThrownBy(() -> ld.update(999, buildMultiLineString(0, 0, 1, 1), Map.of()))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
         }
@@ -384,15 +384,15 @@ class Dataset2DSpecTest {
     void tabular_addRow_and_getRecords_should_work(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("tabular.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "NAME", FieldType.NText, "名称", false)
+                new FieldInfo(0, "NAME", FieldType.NTEXT, "名称", false)
         );
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             TabularDataset td = ds.createTabularDataset("Data", fields);
-            td.addRow(1, Map.of("NAME", "Alice"));
-            td.addRow(2, Map.of("NAME", "Bob"));
+            td.insert(new TabularRecord(1, Map.of("NAME", "Alice")));
+            td.insert(new TabularRecord(2, Map.of("NAME", "Bob")));
 
-            List<TabularRecord> records = td.getRecords();
+            List<TabularRecord> records = td.list();
             assertThat(records).hasSize(2);
         }
     }
@@ -401,17 +401,17 @@ class Dataset2DSpecTest {
     void tabular_addRow_and_getRecord_should_return_correct_data(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("tabular_record.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "CITY", FieldType.NText, "城市", false),
-                new FieldInfo(0, "POP", FieldType.Int32, "人口", false)
+                new FieldInfo(0, "CITY", FieldType.NTEXT, "城市", false),
+                new FieldInfo(0, "POP", FieldType.INT32, "人口", false)
         );
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             TabularDataset td = ds.createTabularDataset("Cities", fields);
-            td.addRow(1, Map.of("CITY", "Beijing", "POP", 21000000));
+            td.insert(new TabularRecord(1, Map.of("CITY", "Beijing", "POP", 21000000)));
 
-            TabularRecord r = td.getRecord(1);
+            TabularRecord r = td.getById(1);
             assertThat(r).isNotNull();
-            assertThat(r.smId()).isEqualTo(1);
+            assertThat(r.id()).isEqualTo(1);
             assertThat(r.attributes()).containsEntry("CITY", "Beijing");
             assertThat(r.attributes()).containsEntry("POP", 21000000);
         }
@@ -423,29 +423,29 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             TabularDataset td = ds.createTabularDataset("Data");
-            assertThat(td.getRecord(999)).isNull();
+            assertThat(td.getById(999)).isNull();
         }
     }
 
     @Test
     void tabular_deleteRow_should_remove_record_and_decrement_count(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("tabular_delete.udbx").toString();
-        List<FieldInfo> fields = List.of(new FieldInfo(0, "VAL", FieldType.NText, "值", false));
+        List<FieldInfo> fields = List.of(new FieldInfo(0, "VAL", FieldType.NTEXT, "值", false));
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             TabularDataset td = ds.createTabularDataset("Data", fields);
-            td.addRow(1, Map.of("VAL", "A"));
-            td.addRow(2, Map.of("VAL", "B"));
-            td.addRow(3, Map.of("VAL", "C"));
+            td.insert(new TabularRecord(1, Map.of("VAL", "A")));
+            td.insert(new TabularRecord(2, Map.of("VAL", "B")));
+            td.insert(new TabularRecord(3, Map.of("VAL", "C")));
 
-            assertThat(td.getRecords()).hasSize(3);
+            assertThat(td.list()).hasSize(3);
 
-            td.deleteRow(2);
+            td.delete(2);
 
-            assertThat(td.getRecords()).hasSize(2);
-            assertThat(td.getRecord(2)).isNull();
-            assertThat(td.getRecord(1)).isNotNull();
-            assertThat(td.getRecord(3)).isNotNull();
+            assertThat(td.list()).hasSize(2);
+            assertThat(td.getById(2)).isNull();
+            assertThat(td.getById(1)).isNotNull();
+            assertThat(td.getById(3)).isNotNull();
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
@@ -457,13 +457,13 @@ class Dataset2DSpecTest {
     @Test
     void tabular_deleteRow_nonexistent_should_throw(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("tabular_delete_none.udbx").toString();
-        List<FieldInfo> fields = List.of(new FieldInfo(0, "VAL", FieldType.NText, "值", false));
+        List<FieldInfo> fields = List.of(new FieldInfo(0, "VAL", FieldType.NTEXT, "值", false));
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             TabularDataset td = ds.createTabularDataset("Data", fields);
-            td.addRow(1, Map.of("VAL", "A"));
+            td.insert(new TabularRecord(1, Map.of("VAL", "A")));
 
-            assertThatThrownBy(() -> td.deleteRow(999))
+            assertThatThrownBy(() -> td.delete(999))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
         }
@@ -473,20 +473,20 @@ class Dataset2DSpecTest {
     void tabular_updateRow_should_change_attributes(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("tabular_update.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "SCORE", FieldType.Int32, "分数", false),
-                new FieldInfo(0, "GRADE", FieldType.NText, "等级", false)
+                new FieldInfo(0, "SCORE", FieldType.INT32, "分数", false),
+                new FieldInfo(0, "GRADE", FieldType.NTEXT, "等级", false)
         );
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             TabularDataset td = ds.createTabularDataset("Students", fields);
-            td.addRow(1, Map.of("SCORE", 60, "GRADE", "C"));
+            td.insert(new TabularRecord(1, Map.of("SCORE", 60, "GRADE", "C")));
 
-            td.updateRow(1, Map.of("SCORE", 95, "GRADE", "A"));
+            td.update(1, Map.of("SCORE", 95, "GRADE", "A"));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             TabularDataset td = (TabularDataset) ds.getDataset("Students");
-            TabularRecord r = td.getRecord(1);
+            TabularRecord r = td.getById(1);
             assertThat(r).isNotNull();
             assertThat(r.attributes()).containsEntry("SCORE", 95);
             assertThat(r.attributes()).containsEntry("GRADE", "A");
@@ -496,13 +496,13 @@ class Dataset2DSpecTest {
     @Test
     void tabular_updateRow_nonexistent_should_throw(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("tabular_update_none.udbx").toString();
-        List<FieldInfo> fields = List.of(new FieldInfo(0, "VAL", FieldType.NText, "值", false));
+        List<FieldInfo> fields = List.of(new FieldInfo(0, "VAL", FieldType.NTEXT, "值", false));
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             TabularDataset td = ds.createTabularDataset("Data", fields);
-            td.addRow(1, Map.of("VAL", "A"));
+            td.insert(new TabularRecord(1, Map.of("VAL", "A")));
 
-            assertThatThrownBy(() -> td.updateRow(999, Map.of("VAL", "X")))
+            assertThatThrownBy(() -> td.update(999, Map.of("VAL", "X")))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
         }
@@ -514,11 +514,11 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             TabularDataset td = ds.createTabularDataset("Data");
-            td.addRow(1, Map.of());
+            td.insert(new TabularRecord(1, Map.of()));
 
-            // updateRow with null/empty should be a no-op (no exception)
-            td.updateRow(1, null);
-            td.updateRow(1, Map.of());
+            // update with null/empty should be a no-op (no exception)
+            td.update(1, null);
+            td.update(1, Map.of());
         }
     }
 
@@ -531,11 +531,11 @@ class Dataset2DSpecTest {
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             CadDataset cd = ds.createCadDataset("CAD");
             CadGeometry.GeoPoint geom = new CadGeometry.GeoPoint(3.0, 4.0, defaultStyleMarker());
-            cd.addFeature(1, geom, Map.of());
+            cd.insert(new CadFeature(1, geom, Map.of()));
 
-            List<CadFeature> features = cd.getFeatures();
+            List<CadFeature> features = cd.list();
             assertThat(features).hasSize(1);
-            assertThat(features.get(0).smId()).isEqualTo(1);
+            assertThat(features.get(0).id()).isEqualTo(1);
             assertThat(features.get(0).geometry()).isInstanceOf(CadGeometry.GeoPoint.class);
 
             CadGeometry.GeoPoint readBack = (CadGeometry.GeoPoint) features.get(0).geometry();
@@ -557,9 +557,9 @@ class Dataset2DSpecTest {
                     new double[]{0.0, 1.0, 0.0},
                     defaultStyleLine()
             );
-            cd.addFeature(1, geom, Map.of());
+            cd.insert(new CadFeature(1, geom, Map.of()));
 
-            CadFeature f = cd.getFeature(1);
+            CadFeature f = cd.getById(1);
             assertThat(f).isNotNull();
             assertThat(f.geometry()).isInstanceOf(CadGeometry.GeoLine.class);
 
@@ -584,9 +584,9 @@ class Dataset2DSpecTest {
                     new double[]{0.0, 0.0, 1.0, 1.0, 0.0},
                     defaultStyleFill()
             );
-            cd.addFeature(1, geom, Map.of());
+            cd.insert(new CadFeature(1, geom, Map.of()));
 
-            CadFeature f = cd.getFeature(1);
+            CadFeature f = cd.getById(1);
             assertThat(f).isNotNull();
             assertThat(f.geometry()).isInstanceOf(CadGeometry.GeoRegion.class);
 
@@ -601,7 +601,7 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             CadDataset cd = ds.createCadDataset("CAD");
-            assertThat(cd.getFeature(999)).isNull();
+            assertThat(cd.getById(999)).isNull();
         }
     }
 
@@ -611,18 +611,18 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             CadDataset cd = ds.createCadDataset("CAD");
-            cd.addFeature(1, new CadGeometry.GeoPoint(1.0, 2.0, defaultStyleMarker()), Map.of());
-            cd.addFeature(2, new CadGeometry.GeoPoint(3.0, 4.0, defaultStyleMarker()), Map.of());
-            cd.addFeature(3, new CadGeometry.GeoPoint(5.0, 6.0, defaultStyleMarker()), Map.of());
+            cd.insert(new CadFeature(1, new CadGeometry.GeoPoint(1.0, 2.0, defaultStyleMarker()), Map.of()));
+            cd.insert(new CadFeature(2, new CadGeometry.GeoPoint(3.0, 4.0, defaultStyleMarker()), Map.of()));
+            cd.insert(new CadFeature(3, new CadGeometry.GeoPoint(5.0, 6.0, defaultStyleMarker()), Map.of()));
 
-            assertThat(cd.getFeatures()).hasSize(3);
+            assertThat(cd.list()).hasSize(3);
 
-            cd.deleteFeature(2);
+            cd.delete(2);
 
-            assertThat(cd.getFeatures()).hasSize(2);
-            assertThat(cd.getFeature(2)).isNull();
-            assertThat(cd.getFeature(1)).isNotNull();
-            assertThat(cd.getFeature(3)).isNotNull();
+            assertThat(cd.list()).hasSize(2);
+            assertThat(cd.getById(2)).isNull();
+            assertThat(cd.getById(1)).isNotNull();
+            assertThat(cd.getById(3)).isNotNull();
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
@@ -637,9 +637,9 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             CadDataset cd = ds.createCadDataset("CAD");
-            cd.addFeature(1, new CadGeometry.GeoPoint(1.0, 2.0, defaultStyleMarker()), Map.of());
+            cd.insert(new CadFeature(1, new CadGeometry.GeoPoint(1.0, 2.0, defaultStyleMarker()), Map.of()));
 
-            assertThatThrownBy(() -> cd.deleteFeature(999))
+            assertThatThrownBy(() -> cd.delete(999))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
         }
@@ -651,15 +651,15 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             CadDataset cd = ds.createCadDataset("CAD");
-            cd.addFeature(1, new CadGeometry.GeoPoint(1.0, 2.0, defaultStyleMarker()), Map.of());
+            cd.insert(new CadFeature(1, new CadGeometry.GeoPoint(1.0, 2.0, defaultStyleMarker()), Map.of()));
 
             CadGeometry.GeoPoint newGeom = new CadGeometry.GeoPoint(10.0, 20.0, defaultStyleMarker());
-            cd.updateFeature(1, newGeom, Map.of());
+            cd.update(1, newGeom, Map.of());
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             CadDataset cd = (CadDataset) ds.getDataset("CAD");
-            CadFeature f = cd.getFeature(1);
+            CadFeature f = cd.getById(1);
             assertThat(f).isNotNull();
             assertThat(f.geometry()).isInstanceOf(CadGeometry.GeoPoint.class);
 
@@ -673,20 +673,20 @@ class Dataset2DSpecTest {
     void cad_updateFeature_with_attributes_should_persist(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("cad_update_attr.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "TAG", FieldType.NText, "标签", false)
+                new FieldInfo(0, "TAG", FieldType.NTEXT, "标签", false)
         );
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             CadDataset cd = ds.createCadDataset("CAD", fields);
-            cd.addFeature(1, new CadGeometry.GeoPoint(1.0, 2.0, defaultStyleMarker()),
-                    Map.of("TAG", "OldTag"));
+            cd.insert(new CadFeature(1, new CadGeometry.GeoPoint(1.0, 2.0, defaultStyleMarker()),
+                    Map.of("TAG", "OldTag")));
 
-            cd.updateFeature(1, null, Map.of("TAG", "NewTag"));
+            cd.update(1, null, Map.of("TAG", "NewTag"));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             CadDataset cd = (CadDataset) ds.getDataset("CAD");
-            CadFeature f = cd.getFeature(1);
+            CadFeature f = cd.getById(1);
             assertThat(f.attributes()).containsEntry("TAG", "NewTag");
         }
     }
@@ -697,9 +697,9 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             CadDataset cd = ds.createCadDataset("CAD");
-            cd.addFeature(1, new CadGeometry.GeoPoint(1.0, 2.0, defaultStyleMarker()), Map.of());
+            cd.insert(new CadFeature(1, new CadGeometry.GeoPoint(1.0, 2.0, defaultStyleMarker()), Map.of()));
 
-            assertThatThrownBy(() -> cd.updateFeature(999,
+            assertThatThrownBy(() -> cd.update(999,
                     new CadGeometry.GeoPoint(0, 0, defaultStyleMarker()), Map.of()))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
@@ -713,9 +713,9 @@ class Dataset2DSpecTest {
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             CadDataset cd = ds.createCadDataset("CAD");
             CadGeometry.GeoCircle geom = new CadGeometry.GeoCircle(5.0, 5.0, 3.0, defaultStyleFill());
-            cd.addFeature(1, geom, Map.of());
+            cd.insert(new CadFeature(1, geom, Map.of()));
 
-            CadFeature f = cd.getFeature(1);
+            CadFeature f = cd.getById(1);
             assertThat(f).isNotNull();
             assertThat(f.geometry()).isInstanceOf(CadGeometry.GeoCircle.class);
 
@@ -732,14 +732,14 @@ class Dataset2DSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             CadDataset cd = ds.createCadDataset("CAD");
-            cd.addFeature(1, new CadGeometry.GeoPoint(1.0, 1.0, defaultStyleMarker()), Map.of());
-            cd.addFeature(2, new CadGeometry.GeoCircle(2.0, 2.0, 1.0, defaultStyleFill()), Map.of());
-            cd.addFeature(3, new CadGeometry.GeoLine(
+            cd.insert(new CadFeature(1, new CadGeometry.GeoPoint(1.0, 1.0, defaultStyleMarker()), Map.of()));
+            cd.insert(new CadFeature(2, new CadGeometry.GeoCircle(2.0, 2.0, 1.0, defaultStyleFill()), Map.of()));
+            cd.insert(new CadFeature(3, new CadGeometry.GeoLine(
                     1, new int[]{2},
                     new double[]{0.0, 1.0}, new double[]{0.0, 1.0},
-                    defaultStyleLine()), Map.of());
+                    defaultStyleLine()), Map.of()));
 
-            List<CadFeature> features = cd.getFeatures();
+            List<CadFeature> features = cd.list();
             assertThat(features).hasSize(3);
         }
     }

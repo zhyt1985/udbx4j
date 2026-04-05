@@ -8,14 +8,14 @@ import java.util.Objects;
 /**
  * 点要素（Point Feature）不可变数据类。
  *
- * <p>包含系统字段 SmID、GAIA 解码后的 JTS Point 几何对象，以及用户属性字段。
+ * <p>包含系统字段 SmID（规范名 id）、GAIA 解码后的 JTS Point 几何对象，以及用户属性字段。
  *
- * @param smId       SmID —— 要素唯一 ID（系统字段）
+ * @param id         要素唯一 ID（对应 SmID）
  * @param geometry   JTS Point 几何对象（SRID 已由 GaiaGeometryReader 设置）
  * @param attributes 用户属性字段（字段名 → 字段值），不可变视图
  */
 public record PointFeature(
-        int smId,
+        int id,
         Point geometry,
         Map<String, Object> attributes
 ) {

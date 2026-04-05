@@ -1,6 +1,7 @@
 package com.supermap.udbx.dataset;
 
 import com.supermap.udbx.core.DatasetInfo;
+import com.supermap.udbx.core.QueryOptions;
 import com.supermap.udbx.geometry.gaia.GaiaGeometryReader;
 import com.supermap.udbx.geometry.gaia.GaiaGeometryWriter;
 import com.supermap.udbx.streaming.AutoCloseableStream;
@@ -21,7 +22,7 @@ import java.util.Map;
 import java.util.stream.StreamSupport;
 
 /**
- * 点数据集实现（DatasetType=Point，geoType=1）。
+ * 点数据集实现（DatasetKind=POINT，geoType=1）。
  *
  * <p>从数据表（如 BaseMap_P）读取点要素，几何数据存储于 SmGeometry 列（GAIA 格式 BLOB）。
  * 属性数据从数据表的用户字段列读取。
@@ -46,20 +47,51 @@ public class PointDataset extends VectorDataset {
      * @return 要素列表（按 SmID 升序）
      * @throws RuntimeException 若数据库查询失败
      */
-    public List<PointFeature> getFeatures() {
-        if (!tableExists()) return List.of();
-        String sql = "SELECT * FROM \"" + getTableName() + "\" ORDER BY SmID";
+    public List<PointFeature> list() {
+        return list(QueryOptions.EMPTY);
+    }
 
-        // 预分配 ArrayList 容量以减少扩容开销
+    /**
+     * 按查询选项读取点要素。
+     *
+     * @param options 查询选项（可为 null）
+     * @return 要素列表（按 SmID 升序）
+     * @throws RuntimeException 若数据库查询失败
+     */
+    public List<PointFeature> list(QueryOptions options) {
+        if (!tableExists()) return List.of();
+        var sqlBuilder = new StringBuilder("SELECT * FROM \"").append(getTableName()).append("\"");
+        var params = new ArrayList<Object>();
+
+        if (options != null && options.ids() != null && !options.ids().isEmpty()) {
+            var placeholders = String.join(", ", java.util.Collections.nCopies(options.ids().size(), "?"));
+            sqlBuilder.append(" WHERE SmID IN (").append(placeholders).append(")");
+            params.addAll(options.ids());
+        }
+        sqlBuilder.append(" ORDER BY SmID");
+
+        if (options != null && options.limit() != null) {
+            sqlBuilder.append(" LIMIT ?");
+            params.add(options.limit());
+        }
+        if (options != null && options.offset() != null) {
+            sqlBuilder.append(" OFFSET ?");
+            params.add(options.offset());
+        }
+
         int estimatedCount = info.objectCount();
         int initialCapacity = Math.max(16, Math.min(estimatedCount, 1_000_000));
         List<PointFeature> features = new ArrayList<>(initialCapacity);
 
-        try (PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-            List<String> userColumns = resolveUserColumns(rs.getMetaData());
-            while (rs.next()) {
-                features.add(mapRow(rs, userColumns));
+        try (PreparedStatement stmt = conn.prepareStatement(sqlBuilder.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                stmt.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = stmt.executeQuery()) {
+                List<String> userColumns = resolveUserColumns(rs.getMetaData());
+                while (rs.next()) {
+                    features.add(mapRow(rs, userColumns));
+                }
             }
         } catch (SQLException e) {
             throw new RuntimeException("读取点数据集 [" + getName() + "] 失败", e);
@@ -68,17 +100,17 @@ public class PointDataset extends VectorDataset {
     }
 
     /**
-     * 根据 SmID 读取单个点要素。
+     * 根据 id 读取单个点要素。
      *
-     * @param smId 要素 SmID
+     * @param id 要素 id（对应 SmID）
      * @return 要素对象，不存在时返回 {@code null}
      * @throws RuntimeException 若数据库查询失败
      */
-    public PointFeature getFeature(int smId) {
+    public PointFeature getById(int id) {
         String sql = "SELECT * FROM \"" + getTableName() + "\" WHERE SmID = ?";
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, smId);
+            stmt.setInt(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (!rs.next()) {
                     return null;
@@ -87,35 +119,7 @@ public class PointDataset extends VectorDataset {
                 return mapRow(rs, userColumns);
             }
         } catch (SQLException e) {
-            throw new RuntimeException("读取点要素 SmID=" + smId + " 失败", e);
-        }
-    }
-
-    /**
-     * 分页查询点要素。
-     *
-     * @param offset 起始位置（从 0 开始）
-     * @param limit  每页数量
-     * @return 要素列表（按 SmID 升序）
-     * @throws RuntimeException 若数据库查询失败
-     */
-    public List<PointFeature> getFeatures(int offset, int limit) {
-        String sql = "SELECT * FROM \"" + getTableName() + "\" ORDER BY SmID LIMIT ? OFFSET ?";
-
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, limit);
-            stmt.setInt(2, offset);
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                List<PointFeature> features = new ArrayList<>(limit);
-                List<String> userColumns = resolveUserColumns(rs.getMetaData());
-                while (rs.next()) {
-                    features.add(mapRow(rs, userColumns));
-                }
-                return features;
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("分页查询失败", e);
+            throw new RuntimeException("读取点要素 id=" + id + " 失败", e);
         }
     }
 
@@ -125,7 +129,7 @@ public class PointDataset extends VectorDataset {
      * @return 要素数量
      * @throws RuntimeException 若数据库查询失败
      */
-    public int getCount() {
+    public int count() {
         String sql = "SELECT COUNT(*) FROM \"" + getTableName() + "\"";
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
@@ -141,7 +145,7 @@ public class PointDataset extends VectorDataset {
      * <p>返回一个可自动关闭的 Stream，避免一次性加载所有数据到内存。
      * 使用 try-with-resources 确保资源释放：
      * <pre>{@code
-     * try (var stream = pointDataset.streamFeatures()) {
+     * try (var stream = pointDataset.stream()) {
      *     stream.getStream().forEach(feature -> process(feature));
      * }
      * }</pre>
@@ -150,9 +154,20 @@ public class PointDataset extends VectorDataset {
      * @throws RuntimeException 若创建流失败
      */
     @Override
-    public AutoCloseableStream<PointFeature> streamFeatures() {
+    public AutoCloseableStream<PointFeature> stream() {
+        return stream(QueryOptions.EMPTY);
+    }
+
+    /**
+     * 按查询选项流式读取点要素。
+     *
+     * @param options 查询选项（可为 null 表示读取全部）
+     * @return 包装了 Stream 和资源的 AutoCloseableStream
+     * @throws RuntimeException 若创建流失败
+     */
+    @Override
+    public AutoCloseableStream<PointFeature> stream(QueryOptions options) {
         if (!tableExists()) {
-            // 表不存在时返回空 Stream
             return new AutoCloseableStream<>(java.util.stream.Stream.empty(), () -> {});
         }
 
@@ -162,7 +177,8 @@ public class PointDataset extends VectorDataset {
                 conn,
                 info,
                 getTableName(),
-                this::mapRowForStream
+                this::mapRowForStream,
+                options
             );
         } catch (SQLException e) {
             throw new RuntimeException("创建 FeatureSpliterator 失败: " + e.getMessage(), e);
@@ -174,7 +190,6 @@ public class PointDataset extends VectorDataset {
                 spliterator
             );
         } catch (Exception e) {
-            // 创建 Stream 失败时，确保关闭 spliterator
             spliterator.close();
             throw new RuntimeException("创建流式读取失败: " + e.getMessage(), e);
         }
@@ -193,8 +208,8 @@ public class PointDataset extends VectorDataset {
      * @param features 点要素列表
      * @throws RuntimeException 若批量写入失败
      */
-    public void addFeaturesBatch(List<PointFeature> features) {
-        if (features.isEmpty()) {
+    public void insertMany(List<PointFeature> features) {
+        if (features == null || features.isEmpty()) {
             return;
         }
 
@@ -207,12 +222,11 @@ public class PointDataset extends VectorDataset {
             int maxGeomSize = 0;
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 for (PointFeature f : features) {
-                    ps.setInt(1, f.smId());
+                    ps.setInt(1, f.id());
                     byte[] geomBytes = GaiaGeometryWriter.writePoint(f.geometry(), info.srid());
                     ps.setBytes(2, geomBytes);
                     ps.addBatch();
 
-                    // 跟踪最大几何尺寸
                     if (geomBytes.length > maxGeomSize) {
                         maxGeomSize = geomBytes.length;
                     }
@@ -221,9 +235,8 @@ public class PointDataset extends VectorDataset {
                 ps.executeBatch();
             }
 
-            // 更新 SmRegister（仅一次）
             new SmRegisterDao(conn).incrementObjectCountBatch(
-                info.datasetId(), features.size(), maxGeomSize);
+                info.id(), features.size(), maxGeomSize);
 
             conn.commit();
         } catch (SQLException e) {
@@ -240,14 +253,15 @@ public class PointDataset extends VectorDataset {
      * <p>自动更新 SmRegister 中的 SmObjectCount 和 SmMaxGeometrySize。
      * 每次调用都包含在一个独立事务中。
      *
-     * @param smId       要素 SmID（必须唯一）
-     * @param geometry   JTS Point（2D）
-     * @param attributes 用户属性字段（暂不写入，预留接口）
+     * @param feature 点要素（id 必须唯一）
      * @throws RuntimeException 若写入失败
      */
-    public void addFeature(int smId, Point geometry, Map<String, Object> attributes) {
-        byte[] geomBytes = GaiaGeometryWriter.writePoint(geometry, info.srid());
-        List<String> attrKeys = attributes == null ? java.util.List.of() : new ArrayList<>(attributes.keySet());
+    public void insert(PointFeature feature) {
+        byte[] geomBytes = GaiaGeometryWriter.writePoint(feature.geometry(), info.srid());
+        Map<String, Object> attributes = feature.attributes();
+        List<String> attrKeys = attributes == null || attributes.isEmpty()
+                ? java.util.List.of()
+                : new ArrayList<>(attributes.keySet());
 
         StringBuilder sqlBuf = new StringBuilder("INSERT INTO \"").append(getTableName())
                 .append("\" (SmID, SmUserID, \"SmGeometry\"");
@@ -263,65 +277,64 @@ public class PointDataset extends VectorDataset {
         try {
             conn.setAutoCommit(false);
             try (PreparedStatement stmt = conn.prepareStatement(sqlBuf.toString())) {
-                stmt.setInt(1, smId);
+                stmt.setInt(1, feature.id());
                 stmt.setBytes(2, geomBytes);
                 for (int i = 0; i < attrKeys.size(); i++) {
                     stmt.setObject(3 + i, attributes.get(attrKeys.get(i)));
                 }
                 stmt.executeUpdate();
             }
-            new SmRegisterDao(conn).incrementObjectCount(info.datasetId(), geomBytes.length);
+            new SmRegisterDao(conn).incrementObjectCount(info.id(), geomBytes.length);
             conn.commit();
         } catch (SQLException e) {
             try { conn.rollback(); } catch (SQLException ignored) {}
-            throw new RuntimeException("写入点要素 SmID=" + smId + " 失败", e);
+            throw new RuntimeException("写入点要素 id=" + feature.id() + " 失败", e);
         } finally {
             try { conn.setAutoCommit(true); } catch (SQLException ignored) {}
         }
     }
 
     /**
-     * 删除指定 SmID 的点要素。
+     * 删除指定 id 的点要素。
      *
-     * @param smId 要素 SmID
+     * @param id 要素 id
      * @throws RuntimeException 若要素不存在或删除失败
      */
-    public void deleteFeature(int smId) {
-        String tableName = info.datasetName();
+    public void delete(int id) {
+        String tableName = info.name();
         String sql = "DELETE FROM \"" + tableName + "\" WHERE SmID = ?";
 
         try {
             conn.setAutoCommit(false);
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-                stmt.setInt(1, smId);
+                stmt.setInt(1, id);
                 int affected = stmt.executeUpdate();
                 if (affected == 0) {
-                    throw new SQLException("SmID=" + smId + " 不存在");
+                    throw new SQLException("id=" + id + " 不存在");
                 }
             }
-            new SmRegisterDao(conn).decrementObjectCount(info.datasetId());
+            new SmRegisterDao(conn).decrementObjectCount(info.id());
             conn.commit();
         } catch (SQLException e) {
             try { conn.rollback(); } catch (SQLException ignored) {}
-            throw new RuntimeException("删除点要素 SmID=" + smId + " 失败: " + e.getMessage(), e);
+            throw new RuntimeException("删除点要素 id=" + id + " 失败: " + e.getMessage(), e);
         } finally {
             try { conn.setAutoCommit(true); } catch (SQLException ignored) {}
         }
     }
 
     /**
-     * 更新指定 SmID 的点要素。
+     * 更新指定 id 的点要素。
      *
-     * @param smId       要素 SmID
+     * @param id         要素 id
      * @param geometry   新几何（可为 null 表示不更新几何）
      * @param attributes 新属性（可为 null 表示不更新属性）
      * @throws RuntimeException 若要素不存在或更新失败
      */
-    public void updateFeature(int smId, Point geometry, Map<String, Object> attributes) {
-        String tableName = info.datasetName();
+    public void update(int id, Point geometry, Map<String, Object> attributes) {
+        String tableName = info.name();
         List<String> attrKeys = attributes == null ? List.of() : new ArrayList<>(attributes.keySet());
 
-        // 构建动态 UPDATE SQL
         StringBuilder sqlBuf = new StringBuilder("UPDATE \"").append(tableName).append("\" SET ");
         boolean hasSet = false;
 
@@ -337,7 +350,7 @@ public class PointDataset extends VectorDataset {
         }
 
         if (!hasSet) {
-            return; // 无更新内容
+            return;
         }
 
         sqlBuf.append(" WHERE SmID = ?");
@@ -356,16 +369,16 @@ public class PointDataset extends VectorDataset {
                     stmt.setObject(paramIdx++, attributes.get(key));
                 }
 
-                stmt.setInt(paramIdx, smId);
+                stmt.setInt(paramIdx, id);
                 int affected = stmt.executeUpdate();
                 if (affected == 0) {
-                    throw new SQLException("SmID=" + smId + " 不存在");
+                    throw new SQLException("id=" + id + " 不存在");
                 }
             }
             conn.commit();
         } catch (SQLException e) {
             try { conn.rollback(); } catch (SQLException ignored) {}
-            throw new RuntimeException("更新点要素 SmID=" + smId + " 失败: " + e.getMessage(), e);
+            throw new RuntimeException("更新点要素 id=" + id + " 失败: " + e.getMessage(), e);
         } finally {
             try { conn.setAutoCommit(true); } catch (SQLException ignored) {}
         }
@@ -385,11 +398,10 @@ public class PointDataset extends VectorDataset {
      * @throws SQLException 若读取失败
      */
     private PointFeature mapRowForStream(ResultSet rs) throws SQLException {
-        int smId = rs.getInt("SmID");
+        int id = rs.getInt("SmID");
         byte[] geomBytes = rs.getBytes(GEOMETRY_COLUMN);
         Point geometry = GaiaGeometryReader.readPoint(geomBytes);
 
-        // 动态解析用户字段
         ResultSetMetaData meta = rs.getMetaData();
         Map<String, Object> attributes = new HashMap<>();
         int columnCount = meta.getColumnCount();
@@ -400,7 +412,7 @@ public class PointDataset extends VectorDataset {
             }
         }
 
-        return new PointFeature(smId, geometry, attributes);
+        return new PointFeature(id, geometry, attributes);
     }
 
     /**
@@ -427,7 +439,7 @@ public class PointDataset extends VectorDataset {
      * @param userColumns 用户字段列名列表
      */
     private PointFeature mapRow(ResultSet rs, List<String> userColumns) throws SQLException {
-        int smId = rs.getInt("SmID");
+        int id = rs.getInt("SmID");
         byte[] geomBytes = rs.getBytes(GEOMETRY_COLUMN);
         Point geometry = GaiaGeometryReader.readPoint(geomBytes);
 
@@ -436,6 +448,6 @@ public class PointDataset extends VectorDataset {
             attributes.put(col, rs.getObject(col));
         }
 
-        return new PointFeature(smId, geometry, attributes);
+        return new PointFeature(id, geometry, attributes);
     }
 }

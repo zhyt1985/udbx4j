@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>测试数据来源：SampleData.udbx 中的 BaseMap_L 数据集。
  * <pre>
- *   BaseMap_L: DatasetType=3 (Line), ObjectCount=47, SRID=4326
+ *   BaseMap_L: DatasetKind=3 (Line), ObjectCount=47, SRID=4326
  * </pre>
  *
  * <p>对应白皮书 §3.1.3（线数据集）和 §4.2.3（GAIA MultiLineString 格式）。
@@ -32,7 +32,7 @@ class LineDatasetReadTest {
             LineDataset dataset = (LineDataset) ds.getDataset("BaseMap_L");
 
             assertThat(dataset).isNotNull();
-            assertThat(dataset.getInfo().datasetName()).isEqualTo("BaseMap_L");
+            assertThat(dataset.getInfo().name()).isEqualTo("BaseMap_L");
         }
     }
 
@@ -41,7 +41,7 @@ class LineDatasetReadTest {
         try (UdbxDataSource ds = UdbxDataSource.open(SAMPLE_DB)) {
             LineDataset dataset = (LineDataset) ds.getDataset("BaseMap_L");
 
-            List<LineFeature> features = dataset.getFeatures();
+            List<LineFeature> features = dataset.list();
 
             // BaseMap_L: ObjectCount=47
             assertThat(features).hasSize(47);
@@ -53,10 +53,10 @@ class LineDatasetReadTest {
         try (UdbxDataSource ds = UdbxDataSource.open(SAMPLE_DB)) {
             LineDataset dataset = (LineDataset) ds.getDataset("BaseMap_L");
 
-            List<LineFeature> features = dataset.getFeatures();
+            List<LineFeature> features = dataset.list();
             LineFeature firstFeature = features.get(0);
 
-            assertThat(firstFeature.smId()).isGreaterThan(0);
+            assertThat(firstFeature.id()).isGreaterThan(0);
             assertThat(firstFeature.geometry()).isNotNull();
             assertThat(firstFeature.geometry()).isInstanceOf(MultiLineString.class);
             assertThat(firstFeature.geometry().isEmpty()).isFalse();

@@ -22,6 +22,6 @@ public abstract class VectorDataset extends Dataset {
      * <p>UDBX 约定：矢量数据集的数据表名称与 SmDatasetName 相同。
      */
     protected String getTableName() {
-        return info.datasetName();
+        return info.name();
     }
 }

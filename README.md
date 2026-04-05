@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.zhyt1985/udbx4j)](https://central.sonatype.com/artifact/io.github.zhyt1985/udbx4j)
 
-> **🎉 v1.0.0 已发布！** 现已发布到 Maven Central，可通过 Maven 依赖使用。
+> **v2.0.0 已发布！** 现已发布到 Maven Central，可通过 Maven 依赖使用。
 
 ## 简介
 
@@ -19,7 +19,7 @@
 - ✅ **高性能** - 纯 Java 实现，零 JNI 开销
   - 单线程读取性能提升 **92.5%**（实测：0.34ms vs 4.5ms 基线）
   - 多线程并发扩展 **3.49 倍**（实测：7.94M vs 2.27M ops/s）
-  - 批量写入性能提升 **10-50 倍**（使用 addFeaturesBatch API）
+  - 批量写入性能提升 **10-50 倍**（使用 insertMany API）
   - 分页查询内存开销仅 **+22%**
 - ✅ **高稳定性** - 无 JNI 内存泄漏风险
   - JVM GC 自动管理内存，零泄漏
@@ -53,7 +53,7 @@
 <dependency>
     <groupId>io.github.zhyt1985</groupId>
     <artifactId>udbx4j</artifactId>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
 </dependency>
 ```
 
@@ -94,12 +94,14 @@ try (UdbxDataSource dataSource = UdbxDataSource.open("points.udbx")) {
 
 ```java
 import com.supermap.udbx.UdbxDataSource;
-import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.core.DatasetKind;
 import com.supermap.udbx.core.FieldInfo;
 import com.supermap.udbx.core.FieldType;
 import com.supermap.udbx.dataset.PointDataset;
 import com.supermap.udbx.dataset.PointFeature;
-import com.supermap.udbx.geometry.gaia.GaiaPoint;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Point;
 
 // 创建新 UDBX 文件
 try (UdbxDataSource dataSource = UdbxDataSource.create("output.udbx")) {
@@ -112,12 +114,16 @@ try (UdbxDataSource dataSource = UdbxDataSource.create("output.udbx")) {
     // 创建点数据集
     PointDataset dataset = dataSource.createPointDataset("MyPoints", fields);
 
+    // 创建 JTS 几何工厂
+    GeometryFactory factory = new GeometryFactory();
+
     // 添加要素
-    PointFeature feature = dataset.createFeature();
-    feature.setGeometry(new GaiaPoint(116.404, 39.915)); // 北京坐标
-    feature.setString("名称", "天安门");
-    feature.setInt32("数量", 100);
-    dataset.add(feature);
+    Point point = factory.createPoint(new Coordinate(116.404, 39.915)); // 北京坐标
+    PointFeature feature = new PointFeature(1, point, Map.of(
+        "名称", "天安门",
+        "数量", 100
+    ));
+    dataset.insert(feature);
 }
 ```
 
@@ -130,7 +136,7 @@ try (UdbxDataSource dataSource = UdbxDataSource.open("large_dataset.udbx")) {
     PointDataset dataset = (PointDataset) dataSource.getDataset("BigData");
 
     // 流式读取，内存占用恒定
-    try (AutoCloseableStream<PointFeature> stream = dataset.streamFeatures()) {
+    try (AutoCloseableStream<PointFeature> stream = dataset.stream()) {
         stream.getStream()
             .filter(f -> f.geometry().getX() > 116.0)
             .limit(1000)
@@ -142,16 +148,18 @@ try (UdbxDataSource dataSource = UdbxDataSource.open("large_dataset.udbx")) {
 #### 分页查询
 
 ```java
+import com.supermap.udbx.core.QueryOptions;
+
 // 分页读取点数据
 try (UdbxDataSource dataSource = UdbxDataSource.open("data.udbx")) {
     PointDataset dataset = (PointDataset) dataSource.getDataset("Points");
 
     int pageSize = 1000;
-    int totalCount = dataset.getCount();
+    int totalCount = dataset.count();
     int pageCount = (totalCount + pageSize - 1) / pageSize;
 
     for (int page = 0; page < pageCount; page++) {
-        List<PointFeature> features = dataset.getFeatures(page * pageSize, pageSize);
+        List<PointFeature> features = dataset.list(new QueryOptions(null, pageSize, page * pageSize));
         System.out.println("Page " + page + ": " + features.size() + " features");
     }
 }
@@ -161,20 +169,24 @@ try (UdbxDataSource dataSource = UdbxDataSource.open("data.udbx")) {
 
 ```java
 import com.supermap.udbx.dataset.PointFeature;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Point;
 
 // 批量写入性能提升 10-50 倍
 try (UdbxDataSource dataSource = UdbxDataSource.create("output.udbx")) {
     PointDataset dataset = (PointDataset) dataSource.getDataset("Points");
 
+    GeometryFactory factory = new GeometryFactory();
     List<PointFeature> batch = new ArrayList<>();
     for (int i = 0; i < 10000; i++) {
-        PointFeature feature = dataset.createFeature();
-        feature.setGeometry(new GaiaPoint(116.0 + i * 0.0001, 39.0 + i * 0.0001));
+        Point point = factory.createPoint(new Coordinate(116.0 + i * 0.0001, 39.0 + i * 0.0001));
+        PointFeature feature = new PointFeature(i + 1, point, Map.of());
         batch.add(feature);
     }
 
     // 单次事务批量写入
-    dataset.addFeaturesBatch(batch);
+    dataset.insertMany(batch);
 }
 ```
 
@@ -211,7 +223,7 @@ udbx4j/
     │   ├── pool/                       # 对象池
     │   │   └── GeometryFactoryPool.java # GeometryFactory 对象池
     │   ├── core/                       # 核心枚举与元信息
-    │   │   ├── DatasetType.java        # 数据集类型枚举
+    │   │   ├── DatasetKind.java       # 数据集类型枚举
     │   │   ├── GeometryType.java       # 几何类型枚举
     │   │   ├── FieldType.java          # 字段类型枚举
     │   │   ├── FieldInfo.java          # 字段元信息
@@ -321,6 +333,16 @@ geoType(int32) | styleSize(int32) | Style(...) | ...geometry data...
 - **白皮书**：`UDBX开放数据格式白皮书(V1.0).pdf`
 - **变更日志**：`CHANGELOG.md`
 - **开发规范**：`rules/` 目录
+
+## udbx4spec 规范合规
+
+本项目严格遵循 `udbx4spec/` 中定义的跨语言规范。关键约束：
+
+- **API 命名**：所有公开 API 必须与 `udbx4spec/docs/01-naming-conventions.md` 对齐
+- **数据模型**：几何模型必须符合 `udbx4spec/docs/02-geometry-model.md`
+- **数据集类型**：`DatasetKind` 枚举值必须与 `udbx4spec/docs/03-dataset-taxonomy.md` 同步
+- **字段类型**：`FieldType` 枚举值必须与 `udbx4spec/docs/04-field-taxonomy.md` 同步（14 种）
+- **变更流程**：任何 API 变更、新增数据集类型或字段类型，必须先在 udbx4spec 中定义，然后在各语言实现中同步
 
 ## 许可证
 

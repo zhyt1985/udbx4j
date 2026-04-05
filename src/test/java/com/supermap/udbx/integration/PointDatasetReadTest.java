@@ -1,7 +1,7 @@
 package com.supermap.udbx.integration;
 
 import com.supermap.udbx.UdbxDataSource;
-import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.core.DatasetKind;
 import com.supermap.udbx.dataset.Dataset;
 import com.supermap.udbx.dataset.PointDataset;
 import com.supermap.udbx.dataset.PointFeature;
@@ -53,7 +53,7 @@ class PointDatasetReadTest {
             assertThat(dataset).isNotNull();
             assertThat(dataset).isInstanceOf(PointDataset.class);
             assertThat(dataset.getName()).isEqualTo("BaseMap_P");
-            assertThat(dataset.getType()).isEqualTo(DatasetType.Point);
+            assertThat(dataset.getKind()).isEqualTo(DatasetKind.POINT);
             assertThat(dataset.getObjectCount()).isEqualTo(15);
             assertThat(dataset.getSrid()).isEqualTo(4326);
         }
@@ -67,7 +67,7 @@ class PointDatasetReadTest {
         try (UdbxDataSource ds = UdbxDataSource.open(SAMPLE_DATA)) {
             PointDataset dataset = (PointDataset) ds.getDataset("BaseMap_P");
 
-            List<PointFeature> features = dataset.getFeatures();
+            List<PointFeature> features = dataset.list();
 
             assertThat(features).hasSize(15);
         }
@@ -83,10 +83,10 @@ class PointDatasetReadTest {
         try (UdbxDataSource ds = UdbxDataSource.open(SAMPLE_DATA)) {
             PointDataset dataset = (PointDataset) ds.getDataset("BaseMap_P");
 
-            PointFeature feature = dataset.getFeature(1);
+            PointFeature feature = dataset.getById(1);
 
             assertThat(feature).isNotNull();
-            assertThat(feature.smId()).isEqualTo(1);
+            assertThat(feature.id()).isEqualTo(1);
 
             Point geom = feature.geometry();
             assertThat(geom).isNotNull();
@@ -104,7 +104,7 @@ class PointDatasetReadTest {
         try (UdbxDataSource ds = UdbxDataSource.open(SAMPLE_DATA)) {
             PointDataset dataset = (PointDataset) ds.getDataset("BaseMap_P");
 
-            PointFeature feature = dataset.getFeature(1);
+            PointFeature feature = dataset.getById(1);
 
             assertThat(feature).isNotNull();
             assertThat(feature.attributes()).containsKey("NAME");

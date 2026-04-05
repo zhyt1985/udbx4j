@@ -2,7 +2,7 @@ package com.supermap.udbx.viewer;
 
 import com.supermap.udbx.UdbxDataSource;
 import com.supermap.udbx.core.DatasetInfo;
-import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.core.DatasetKind;
 import com.supermap.udbx.dataset.CadDataset;
 import com.supermap.udbx.dataset.CadFeature;
 import com.supermap.udbx.dataset.Dataset;
@@ -163,7 +163,7 @@ public class UdbxViewerApp extends JFrame {
         try {
             currentDataSource = UdbxDataSource.open(path);
             currentFilePath = path;
-            List<DatasetInfo> infos = currentDataSource.listDatasetInfos();
+            List<DatasetInfo> infos = currentDataSource.listDatasets();
             populateTree(new File(path).getName(), infos);
             clearTable();
             setStatus("已打开：" + path + "（共 " + infos.size() + " 个数据集）");
@@ -199,7 +199,7 @@ public class UdbxViewerApp extends JFrame {
     private void populateTree(String filename, List<DatasetInfo> infos) {
         DefaultMutableTreeNode root = new DefaultMutableTreeNode(filename);
         for (DatasetInfo info : infos) {
-            String label = info.datasetName() + "  (" + info.objectCount() + " 条)";
+            String label = info.name() + "  (" + info.objectCount() + " 条)";
             DefaultMutableTreeNode node = new DefaultMutableTreeNode(
                     new DatasetNode(label, info));
             root.add(node);
@@ -222,32 +222,32 @@ public class UdbxViewerApp extends JFrame {
 
     private void loadDatasetFeatures(DatasetInfo info) {
         if (currentDataSource == null) return;
-        setStatus("正在加载 " + info.datasetName() + " ...");
+        setStatus("正在加载 " + info.name() + " ...");
         try {
-            Dataset dataset = currentDataSource.getDataset(info.datasetName());
+            Dataset dataset = currentDataSource.getDataset(info.name());
             if (dataset == null) {
-                setStatus("数据集不存在：" + info.datasetName());
+                setStatus("数据集不存在：" + info.name());
                 return;
             }
-            switch (info.datasetType()) {
-                case Point   -> showPointFeatures(((PointDataset) dataset).getFeatures(), dataset.getName(), "点数据集");
-                case PointZ  -> showPointFeatures(((PointZDataset) dataset).getFeatures(), dataset.getName(), "3D 点数据集");
-                case Line    -> showLineFeatures(((LineDataset) dataset).getFeatures(), dataset.getName(), "线数据集");
-                case LineZ   -> showLineFeatures(((LineZDataset) dataset).getFeatures(), dataset.getName(), "3D 线数据集");
-                case Region  -> showRegionFeatures(((RegionDataset) dataset).getFeatures(), dataset.getName(), "面数据集");
-                case RegionZ -> showRegionFeatures(((RegionZDataset) dataset).getFeatures(), dataset.getName(), "3D 面数据集");
+            switch (info.kind()) {
+                case POINT   -> showPointFeatures(((PointDataset) dataset).list(), dataset.getName(), "点数据集");
+                case POINT_Z  -> showPointFeatures(((PointZDataset) dataset).list(), dataset.getName(), "3D 点数据集");
+                case LINE    -> showLineFeatures(((LineDataset) dataset).list(), dataset.getName(), "线数据集");
+                case LINE_Z   -> showLineFeatures(((LineZDataset) dataset).list(), dataset.getName(), "3D 线数据集");
+                case REGION  -> showRegionFeatures(((RegionDataset) dataset).list(), dataset.getName(), "面数据集");
+                case REGION_Z -> showRegionFeatures(((RegionZDataset) dataset).list(), dataset.getName(), "3D 面数据集");
                 case CAD     -> showCadFeatures((CadDataset) dataset);
-                case Tabular -> showTabularRecords((TabularDataset) dataset);
+                case TABULAR -> showTabularRecords((TabularDataset) dataset);
                 default -> {
                     clearTable();
-                    setStatus("暂不支持展示该类型数据集：" + info.datasetType());
+                    setStatus("暂不支持展示该类型数据集：" + info.kind());
                 }
             }
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this,
                     "加载数据集出错：\n" + ex.getMessage(),
                     "错误", JOptionPane.ERROR_MESSAGE);
-            setStatus("加载失败：" + info.datasetName());
+            setStatus("加载失败：" + info.name());
         }
     }
 
@@ -260,7 +260,7 @@ public class UdbxViewerApp extends JFrame {
         Object[][] data = new Object[features.size()][cols.size()];
         for (int i = 0; i < features.size(); i++) {
             PointFeature f = features.get(i);
-            data[i][0] = f.smId();
+            data[i][0] = f.id();
             data[i][1] = geometrySummary(f.geometry());
             fillAttrs(data[i], f.attributes(), cols, 2);
         }
@@ -277,7 +277,7 @@ public class UdbxViewerApp extends JFrame {
         Object[][] data = new Object[features.size()][cols.size()];
         for (int i = 0; i < features.size(); i++) {
             LineFeature f = features.get(i);
-            data[i][0] = f.smId();
+            data[i][0] = f.id();
             data[i][1] = geometrySummary(f.geometry());
             fillAttrs(data[i], f.attributes(), cols, 2);
         }
@@ -294,7 +294,7 @@ public class UdbxViewerApp extends JFrame {
         Object[][] data = new Object[features.size()][cols.size()];
         for (int i = 0; i < features.size(); i++) {
             RegionFeature f = features.get(i);
-            data[i][0] = f.smId();
+            data[i][0] = f.id();
             data[i][1] = geometrySummary(f.geometry());
             fillAttrs(data[i], f.attributes(), cols, 2);
         }
@@ -303,7 +303,7 @@ public class UdbxViewerApp extends JFrame {
     }
 
     private void showCadFeatures(CadDataset dataset) {
-        List<CadFeature> features = dataset.getFeatures();
+        List<CadFeature> features = dataset.list();
         if (features.isEmpty()) {
             showEmpty(dataset.getName(), true);
             return;
@@ -312,7 +312,7 @@ public class UdbxViewerApp extends JFrame {
         Object[][] data = new Object[features.size()][cols.size()];
         for (int i = 0; i < features.size(); i++) {
             CadFeature f = features.get(i);
-            data[i][0] = f.smId();
+            data[i][0] = f.id();
             data[i][1] = f.geometry() == null ? "(null)" : f.geometry().getClass().getSimpleName();
             fillAttrs(data[i], f.attributes(), cols, 2);
         }
@@ -321,7 +321,7 @@ public class UdbxViewerApp extends JFrame {
     }
 
     private void showTabularRecords(TabularDataset dataset) {
-        List<TabularRecord> records = dataset.getRecords();
+        List<TabularRecord> records = dataset.list();
         if (records.isEmpty()) {
             showEmpty(dataset.getName(), false);
             return;
@@ -330,7 +330,7 @@ public class UdbxViewerApp extends JFrame {
         Object[][] data = new Object[records.size()][cols.size()];
         for (int i = 0; i < records.size(); i++) {
             TabularRecord r = records.get(i);
-            data[i][0] = r.smId();
+            data[i][0] = r.id();
             fillAttrs(data[i], r.attributes(), cols, 1);
         }
         applyTable(data, cols.toArray(String[]::new));
@@ -411,11 +411,11 @@ public class UdbxViewerApp extends JFrame {
     // ── 图标与渲染器 ──────────────────────────────────────────────────────────
 
     /** 可在查看器中展示数据的类型集合 */
-    private static final Set<DatasetType> SUPPORTED_TYPES = EnumSet.of(
-            DatasetType.Point, DatasetType.PointZ,
-            DatasetType.Line,  DatasetType.LineZ,
-            DatasetType.Region, DatasetType.RegionZ,
-            DatasetType.CAD,   DatasetType.Tabular);
+    private static final Set<DatasetKind> SUPPORTED_TYPES = EnumSet.of(
+            DatasetKind.POINT, DatasetKind.POINT_Z,
+            DatasetKind.LINE,  DatasetKind.LINE_Z,
+            DatasetKind.REGION, DatasetKind.REGION_Z,
+            DatasetKind.CAD,   DatasetKind.TABULAR);
 
     /**
      * 自定义树单元格渲染器，为每种数据集类型显示不同图标：
@@ -434,7 +434,7 @@ public class UdbxViewerApp extends JFrame {
             Object userObj = dmtn.getUserObject();
             if (!(userObj instanceof DatasetNode dn)) return this;
 
-            DatasetType type = dn.info().datasetType();
+            DatasetKind type = dn.info().kind();
             setIcon(DatasetIcons.forType(type));
             if (!SUPPORTED_TYPES.contains(type)) {
                 setForeground(selected ? Color.WHITE : Color.GRAY);
@@ -446,22 +446,22 @@ public class UdbxViewerApp extends JFrame {
     /** 按需创建并缓存各数据集类型的图标 */
     private static class DatasetIcons {
 
-        private static final java.util.Map<DatasetType, Icon> CACHE = new java.util.EnumMap<>(DatasetType.class);
+        private static final java.util.Map<DatasetKind, Icon> CACHE = new java.util.EnumMap<>(DatasetKind.class);
 
-        static Icon forType(DatasetType type) {
+        static Icon forType(DatasetKind type) {
             return CACHE.computeIfAbsent(type, DatasetIcons::create);
         }
 
-        private static Icon create(DatasetType type) {
+        private static Icon create(DatasetKind type) {
             return switch (type) {
-                case Point   -> iconPoint(new Color(0x2196F3), false);  // 蓝色圆点
-                case PointZ  -> iconPoint(new Color(0x0D47A1), true);   // 深蓝 3D 点
-                case Line    -> iconLine(new Color(0x4CAF50), false);   // 绿色线
-                case LineZ   -> iconLine(new Color(0x1B5E20), true);    // 深绿 3D 线
-                case Region  -> iconRegion(new Color(0xFF9800), false); // 橙色面
-                case RegionZ -> iconRegion(new Color(0xE65100), true);  // 深橙 3D 面
+                case POINT   -> iconPoint(new Color(0x2196F3), false);  // 蓝色圆点
+                case POINT_Z  -> iconPoint(new Color(0x0D47A1), true);   // 深蓝 3D 点
+                case LINE    -> iconLine(new Color(0x4CAF50), false);   // 绿色线
+                case LINE_Z   -> iconLine(new Color(0x1B5E20), true);    // 深绿 3D 线
+                case REGION  -> iconRegion(new Color(0xFF9800), false); // 橙色面
+                case REGION_Z -> iconRegion(new Color(0xE65100), true);  // 深橙 3D 面
                 case CAD     -> iconCad();                              // 紫色 CAD
-                case Tabular -> iconTabular();                          // 灰色表格
+                case TABULAR -> iconTabular();                          // 灰色表格
                 default      -> iconUnsupported();                      // 黄色警告
             };
         }

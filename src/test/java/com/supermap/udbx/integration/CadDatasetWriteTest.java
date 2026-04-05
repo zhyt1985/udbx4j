@@ -41,16 +41,16 @@ class CadDatasetWriteTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path.toString())) {
             CadDataset cad = ds.createCadDataset("MyCAD");
-            cad.addFeature(1, new CadGeometry.GeoPoint(1.0, 2.0, MARKER), Map.of());
+            cad.insert(new CadFeature(1, new CadGeometry.GeoPoint(1.0, 2.0, MARKER), Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path.toString())) {
             CadDataset cad = (CadDataset) ds.getDataset("MyCAD");
             assertThat(cad).isNotNull();
-            List<CadFeature> features = cad.getFeatures();
+            List<CadFeature> features = cad.list();
             assertThat(features).hasSize(1);
             CadFeature f = features.get(0);
-            assertThat(f.smId()).isEqualTo(1);
+            assertThat(f.id()).isEqualTo(1);
             assertThat(f.geometry()).isInstanceOf(CadGeometry.GeoPoint.class);
         }
     }
@@ -61,12 +61,12 @@ class CadDatasetWriteTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path.toString())) {
             CadDataset cad = ds.createCadDataset("RoundTripCAD");
-            cad.addFeature(1, new CadGeometry.GeoPoint(116.39, 39.91, MARKER), Map.of());
+            cad.insert(new CadFeature(1, new CadGeometry.GeoPoint(116.39, 39.91, MARKER), Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path.toString())) {
             CadDataset cad = (CadDataset) ds.getDataset("RoundTripCAD");
-            CadFeature feature = cad.getFeature(1);
+            CadFeature feature = cad.getById(1);
             assertThat(feature).isNotNull();
 
             CadGeometry.GeoPoint point = (CadGeometry.GeoPoint) feature.geometry();
@@ -83,12 +83,12 @@ class CadDatasetWriteTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path.toString())) {
             CadDataset cad = ds.createCadDataset("LineCAD");
-            cad.addFeature(1, new CadGeometry.GeoLine(1, new int[]{3}, xs, ys, LINE_STYLE), Map.of());
+            cad.insert(new CadFeature(1, new CadGeometry.GeoLine(1, new int[]{3}, xs, ys, LINE_STYLE), Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path.toString())) {
             CadDataset cad = (CadDataset) ds.getDataset("LineCAD");
-            CadFeature feature = cad.getFeature(1);
+            CadFeature feature = cad.getById(1);
             CadGeometry.GeoLine line = (CadGeometry.GeoLine) feature.geometry();
             assertThat(line.subPointCounts()).hasSize(1);
             assertThat(line.subPointCounts()[0]).isEqualTo(3);
@@ -105,12 +105,12 @@ class CadDatasetWriteTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path.toString())) {
             CadDataset cad = ds.createCadDataset("RegionCAD");
-            cad.addFeature(1, new CadGeometry.GeoRegion(1, new int[]{5}, xs, ys, FILL_STYLE), Map.of());
+            cad.insert(new CadFeature(1, new CadGeometry.GeoRegion(1, new int[]{5}, xs, ys, FILL_STYLE), Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path.toString())) {
             CadDataset cad = (CadDataset) ds.getDataset("RegionCAD");
-            CadFeature feature = cad.getFeature(1);
+            CadFeature feature = cad.getById(1);
             assertThat(feature.geometry()).isInstanceOf(CadGeometry.GeoRegion.class);
             CadGeometry.GeoRegion region = (CadGeometry.GeoRegion) feature.geometry();
             assertThat(region.subPointCounts()[0]).isEqualTo(5);
@@ -123,17 +123,17 @@ class CadDatasetWriteTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path.toString())) {
             CadDataset cad = ds.createCadDataset("MultiCAD");
-            cad.addFeature(1, new CadGeometry.GeoPoint(1.0, 2.0, MARKER), Map.of());
-            cad.addFeature(2, new CadGeometry.GeoPoint(3.0, 4.0, MARKER), Map.of());
-            cad.addFeature(3, new CadGeometry.GeoPoint(5.0, 6.0, MARKER), Map.of());
+            cad.insert(new CadFeature(1, new CadGeometry.GeoPoint(1.0, 2.0, MARKER), Map.of()));
+            cad.insert(new CadFeature(2, new CadGeometry.GeoPoint(3.0, 4.0, MARKER), Map.of()));
+            cad.insert(new CadFeature(3, new CadGeometry.GeoPoint(5.0, 6.0, MARKER), Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path.toString())) {
             CadDataset cad = (CadDataset) ds.getDataset("MultiCAD");
-            List<CadFeature> features = cad.getFeatures();
+            List<CadFeature> features = cad.list();
             assertThat(features).hasSize(3);
-            assertThat(features.get(0).smId()).isEqualTo(1);
-            assertThat(features.get(2).smId()).isEqualTo(3);
+            assertThat(features.get(0).id()).isEqualTo(1);
+            assertThat(features.get(2).id()).isEqualTo(3);
         }
     }
 
@@ -143,12 +143,12 @@ class CadDatasetWriteTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path.toString())) {
             CadDataset cad = ds.createCadDataset("NullCAD");
-            cad.addFeature(1, new CadGeometry.GeoPoint(0.0, 0.0, MARKER), Map.of());
+            cad.insert(new CadFeature(1, new CadGeometry.GeoPoint(0.0, 0.0, MARKER), Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path.toString())) {
             CadDataset cad = (CadDataset) ds.getDataset("NullCAD");
-            assertThat(cad.getFeature(99999)).isNull();
+            assertThat(cad.getById(99999)).isNull();
         }
     }
 }

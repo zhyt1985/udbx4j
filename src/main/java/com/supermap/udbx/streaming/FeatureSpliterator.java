@@ -1,11 +1,15 @@
 package com.supermap.udbx.streaming;
 
 import com.supermap.udbx.core.DatasetInfo;
+import com.supermap.udbx.core.QueryOptions;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.Consumer;
@@ -53,7 +57,7 @@ public class FeatureSpliterator<T> extends Spliterators.AbstractSpliterator<T> i
     }
 
     /**
-     * 创建 FeatureSpliterator。
+     * 创建 FeatureSpliterator（读取全部要素）。
      *
      * @param conn      数据库连接
      * @param info      数据集元信息
@@ -66,6 +70,25 @@ public class FeatureSpliterator<T> extends Spliterators.AbstractSpliterator<T> i
             DatasetInfo info,
             String tableName,
             RowMapper<T> rowMapper) throws SQLException {
+        this(conn, info, tableName, rowMapper, null);
+    }
+
+    /**
+     * 创建 FeatureSpliterator（按查询选项过滤）。
+     *
+     * @param conn      数据库连接
+     * @param info      数据集元信息
+     * @param tableName 数据表名称（将进行 SQL 转义，防止注入）
+     * @param rowMapper 行映射器
+     * @param options   查询选项（可为 null 表示读取全部）
+     * @throws SQLException 若查询执行失败
+     */
+    public FeatureSpliterator(
+            Connection conn,
+            DatasetInfo info,
+            String tableName,
+            RowMapper<T> rowMapper,
+            QueryOptions options) throws SQLException {
         super(Long.MAX_VALUE, Spliterator.ORDERED | Spliterator.NONNULL);
         this.conn = conn;
         this.info = info;
@@ -73,8 +96,30 @@ public class FeatureSpliterator<T> extends Spliterators.AbstractSpliterator<T> i
 
         // 使用 PreparedStatement 参数化查询，防止 SQL 注入
         // 表名通过转义处理，字段名使用硬编码（不支持用户输入）
-        String sql = "SELECT * FROM \"" + escapeTableName(tableName) + "\" ORDER BY SmID";
-        this.stmt = conn.prepareStatement(sql);
+        var sqlBuilder = new StringBuilder("SELECT * FROM \"")
+                .append(escapeTableName(tableName)).append("\"");
+        List<Object> params = new ArrayList<>();
+
+        if (options != null && options.ids() != null && !options.ids().isEmpty()) {
+            var placeholders = String.join(", ", Collections.nCopies(options.ids().size(), "?"));
+            sqlBuilder.append(" WHERE SmID IN (").append(placeholders).append(")");
+            params.addAll(options.ids());
+        }
+        sqlBuilder.append(" ORDER BY SmID");
+
+        if (options != null && options.limit() != null) {
+            sqlBuilder.append(" LIMIT ?");
+            params.add(options.limit());
+        }
+        if (options != null && options.offset() != null) {
+            sqlBuilder.append(" OFFSET ?");
+            params.add(options.offset());
+        }
+
+        this.stmt = conn.prepareStatement(sqlBuilder.toString());
+        for (int i = 0; i < params.size(); i++) {
+            stmt.setObject(i + 1, params.get(i));
+        }
         this.rs = stmt.executeQuery();
     }
 
@@ -108,7 +153,7 @@ public class FeatureSpliterator<T> extends Spliterators.AbstractSpliterator<T> i
         } catch (SQLException e) {
             // 发生异常，关闭资源并抛出 RuntimeException
             close();
-            throw new RuntimeException("读取数据集 [" + info.datasetName() + "] 失败", e);
+            throw new RuntimeException("读取数据集 [" + info.name() + "] 失败", e);
         }
     }
 

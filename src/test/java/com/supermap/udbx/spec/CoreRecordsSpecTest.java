@@ -1,7 +1,7 @@
 package com.supermap.udbx.spec;
 
 import com.supermap.udbx.core.DatasetInfo;
-import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.core.DatasetKind;
 import com.supermap.udbx.core.FieldInfo;
 import com.supermap.udbx.core.FieldType;
 import org.junit.jupiter.api.Test;
@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * <pre>
  *   SmDatasetID     int     数据集 ID
  *   SmDatasetName   String  数据集名称
- *   SmDatasetType   int     数据集类型（→ DatasetType）
+ *   SmDatasetKind   int     数据集类型（→ DatasetKind）
  *   SmObjectCount   int     要素数量
  *   SmSRID          int     坐标系 ID
  * </pre>
@@ -42,19 +42,19 @@ class CoreRecordsSpecTest {
 
     @Test
     void dataset_info_must_expose_all_fields() {
-        DatasetInfo info = new DatasetInfo(1, "BaseMap_P", DatasetType.Point, 15, 4326);
+        DatasetInfo info = new DatasetInfo(1, "BaseMap_P", DatasetKind.POINT, 15, 4326);
 
-        assertThat(info.datasetId()).isEqualTo(1);
-        assertThat(info.datasetName()).isEqualTo("BaseMap_P");
-        assertThat(info.datasetType()).isEqualTo(DatasetType.Point);
+        assertThat(info.id()).isEqualTo(1);
+        assertThat(info.name()).isEqualTo("BaseMap_P");
+        assertThat(info.kind()).isEqualTo(DatasetKind.POINT);
         assertThat(info.objectCount()).isEqualTo(15);
         assertThat(info.srid()).isEqualTo(4326);
     }
 
     @Test
     void dataset_info_must_be_immutable_record() {
-        DatasetInfo a = new DatasetInfo(1, "A", DatasetType.Point, 10, 4326);
-        DatasetInfo b = new DatasetInfo(1, "A", DatasetType.Point, 10, 4326);
+        DatasetInfo a = new DatasetInfo(1, "A", DatasetKind.POINT, 10, 4326);
+        DatasetInfo b = new DatasetInfo(1, "A", DatasetKind.POINT, 10, 4326);
 
         // Java Record 自动生成 equals / hashCode
         assertThat(a).isEqualTo(b);
@@ -63,14 +63,14 @@ class CoreRecordsSpecTest {
 
     @Test
     void dataset_info_toString_must_include_dataset_name() {
-        DatasetInfo info = new DatasetInfo(2, "BaseMap_L", DatasetType.Line, 47, 4326);
+        DatasetInfo info = new DatasetInfo(2, "BaseMap_L", DatasetKind.LINE, 47, 4326);
 
         assertThat(info.toString()).contains("BaseMap_L");
     }
 
     @Test
     void dataset_info_must_reject_null_name() {
-        assertThatThrownBy(() -> new DatasetInfo(1, null, DatasetType.Point, 0, 4326))
+        assertThatThrownBy(() -> new DatasetInfo(1, null, DatasetKind.POINT, 0, 4326))
             .isInstanceOf(NullPointerException.class);
     }
 
@@ -82,7 +82,7 @@ class CoreRecordsSpecTest {
 
     @Test
     void dataset_info_object_count_can_be_zero() {
-        DatasetInfo info = new DatasetInfo(1, "Empty", DatasetType.Tabular, 0, 0);
+        DatasetInfo info = new DatasetInfo(1, "Empty", DatasetKind.TABULAR, 0, 0);
 
         assertThat(info.objectCount()).isEqualTo(0);
     }
@@ -91,19 +91,19 @@ class CoreRecordsSpecTest {
 
     @Test
     void field_info_must_expose_all_fields() {
-        FieldInfo field = new FieldInfo(1, "NAME", FieldType.NText, "名称", false);
+        FieldInfo field = new FieldInfo(1, "NAME", FieldType.NTEXT, "名称", false);
 
         assertThat(field.datasetId()).isEqualTo(1);
-        assertThat(field.fieldName()).isEqualTo("NAME");
-        assertThat(field.fieldType()).isEqualTo(FieldType.NText);
-        assertThat(field.fieldAlias()).isEqualTo("名称");
+        assertThat(field.name()).isEqualTo("NAME");
+        assertThat(field.fieldType()).isEqualTo(FieldType.NTEXT);
+        assertThat(field.alias()).isEqualTo("名称");
         assertThat(field.required()).isFalse();
     }
 
     @Test
     void field_info_must_be_immutable_record() {
-        FieldInfo a = new FieldInfo(1, "ID", FieldType.Int32, "编号", true);
-        FieldInfo b = new FieldInfo(1, "ID", FieldType.Int32, "编号", true);
+        FieldInfo a = new FieldInfo(1, "ID", FieldType.INT32, "编号", true);
+        FieldInfo b = new FieldInfo(1, "ID", FieldType.INT32, "编号", true);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -111,14 +111,14 @@ class CoreRecordsSpecTest {
 
     @Test
     void field_info_toString_must_include_field_name() {
-        FieldInfo field = new FieldInfo(1, "AREA", FieldType.Double, "面积", false);
+        FieldInfo field = new FieldInfo(1, "AREA", FieldType.DOUBLE, "面积", false);
 
         assertThat(field.toString()).contains("AREA");
     }
 
     @Test
     void field_info_must_reject_null_field_name() {
-        assertThatThrownBy(() -> new FieldInfo(1, null, FieldType.Int32, "别名", false))
+        assertThatThrownBy(() -> new FieldInfo(1, null, FieldType.INT32, "别名", false))
             .isInstanceOf(NullPointerException.class);
     }
 
@@ -130,8 +130,8 @@ class CoreRecordsSpecTest {
 
     @Test
     void field_info_alias_can_be_empty_string() {
-        FieldInfo field = new FieldInfo(1, "CODE", FieldType.Int32, "", false);
+        FieldInfo field = new FieldInfo(1, "CODE", FieldType.INT32, "", false);
 
-        assertThat(field.fieldAlias()).isEmpty();
+        assertThat(field.alias()).isEmpty();
     }
 }

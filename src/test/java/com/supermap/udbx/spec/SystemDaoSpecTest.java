@@ -1,7 +1,7 @@
 package com.supermap.udbx.spec;
 
 import com.supermap.udbx.core.DatasetInfo;
-import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.core.DatasetKind;
 import com.supermap.udbx.core.FieldInfo;
 import com.supermap.udbx.core.FieldType;
 import com.supermap.udbx.system.GeometryColumnsDao;
@@ -61,9 +61,9 @@ class SystemDaoSpecTest {
     @Test
     void smregister_findAll_returns_all_inserted_datasets() throws Exception {
         SmRegisterDao dao = new SmRegisterDao(conn);
-        dao.insert("Pts", DatasetType.Point, 4326, "SmID", "SmGeometry");
-        dao.insert("Lines", DatasetType.Line, 4326, "SmID", "SmGeometry");
-        dao.insert("Regions", DatasetType.Region, 4326, "SmID", "SmGeometry");
+        dao.insert("Pts", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
+        dao.insert("Lines", DatasetKind.LINE, 4326, "SmID", "SmGeometry");
+        dao.insert("Regions", DatasetKind.REGION, 4326, "SmID", "SmGeometry");
 
         List<DatasetInfo> result = dao.findAll();
 
@@ -73,15 +73,15 @@ class SystemDaoSpecTest {
     @Test
     void smregister_findAll_ordered_by_dataset_id() throws Exception {
         SmRegisterDao dao = new SmRegisterDao(conn);
-        dao.insert("A", DatasetType.Point, 4326, "SmID", "SmGeometry");
-        dao.insert("B", DatasetType.Line, 4326, "SmID", "SmGeometry");
-        dao.insert("C", DatasetType.Region, 4326, "SmID", "SmGeometry");
+        dao.insert("A", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
+        dao.insert("B", DatasetKind.LINE, 4326, "SmID", "SmGeometry");
+        dao.insert("C", DatasetKind.REGION, 4326, "SmID", "SmGeometry");
 
         List<DatasetInfo> result = dao.findAll();
 
-        assertThat(result.get(0).datasetName()).isEqualTo("A");
-        assertThat(result.get(1).datasetName()).isEqualTo("B");
-        assertThat(result.get(2).datasetName()).isEqualTo("C");
+        assertThat(result.get(0).name()).isEqualTo("A");
+        assertThat(result.get(1).name()).isEqualTo("B");
+        assertThat(result.get(2).name()).isEqualTo("C");
     }
 
     // ── SmRegisterDao: findByName ─────────────────────────────────────────────
@@ -89,13 +89,13 @@ class SystemDaoSpecTest {
     @Test
     void smregister_findByName_returns_correct_dataset_info() throws Exception {
         SmRegisterDao dao = new SmRegisterDao(conn);
-        dao.insert("MyPoint", DatasetType.Point, 4326, "SmID", "SmGeometry");
+        dao.insert("MyPoint", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
 
         Optional<DatasetInfo> result = dao.findByName("MyPoint");
 
         assertThat(result).isPresent();
-        assertThat(result.get().datasetName()).isEqualTo("MyPoint");
-        assertThat(result.get().datasetType()).isEqualTo(DatasetType.Point);
+        assertThat(result.get().name()).isEqualTo("MyPoint");
+        assertThat(result.get().kind()).isEqualTo(DatasetKind.POINT);
         assertThat(result.get().srid()).isEqualTo(4326);
         assertThat(result.get().objectCount()).isEqualTo(0);
     }
@@ -112,24 +112,24 @@ class SystemDaoSpecTest {
     @Test
     void smregister_findByName_returns_correct_type_for_tabular() throws Exception {
         SmRegisterDao dao = new SmRegisterDao(conn);
-        dao.insert("MyTable", DatasetType.Tabular, 0, "SmID", null);
+        dao.insert("MyTable", DatasetKind.TABULAR, 0, "SmID", null);
 
         Optional<DatasetInfo> result = dao.findByName("MyTable");
 
         assertThat(result).isPresent();
-        assertThat(result.get().datasetType()).isEqualTo(DatasetType.Tabular);
+        assertThat(result.get().kind()).isEqualTo(DatasetKind.TABULAR);
         assertThat(result.get().srid()).isEqualTo(0);
     }
 
     @Test
     void smregister_findByName_returns_correct_type_for_cad() throws Exception {
         SmRegisterDao dao = new SmRegisterDao(conn);
-        dao.insert("MyCad", DatasetType.CAD, 0, "SmID", "SmGeometry");
+        dao.insert("MyCad", DatasetKind.CAD, 0, "SmID", "SmGeometry");
 
         Optional<DatasetInfo> result = dao.findByName("MyCad");
 
         assertThat(result).isPresent();
-        assertThat(result.get().datasetType()).isEqualTo(DatasetType.CAD);
+        assertThat(result.get().kind()).isEqualTo(DatasetKind.CAD);
     }
 
     // ── SmRegisterDao: findById ───────────────────────────────────────────────
@@ -137,13 +137,13 @@ class SystemDaoSpecTest {
     @Test
     void smregister_findById_returns_correct_dataset_info() throws Exception {
         SmRegisterDao dao = new SmRegisterDao(conn);
-        int id = dao.insert("PtById", DatasetType.Point, 4326, "SmID", "SmGeometry");
+        int id = dao.insert("PtById", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
 
         Optional<DatasetInfo> result = dao.findById(id);
 
         assertThat(result).isPresent();
-        assertThat(result.get().datasetId()).isEqualTo(id);
-        assertThat(result.get().datasetName()).isEqualTo("PtById");
+        assertThat(result.get().id()).isEqualTo(id);
+        assertThat(result.get().name()).isEqualTo("PtById");
     }
 
     @Test
@@ -161,9 +161,9 @@ class SystemDaoSpecTest {
     void smregister_insert_assigns_sequential_ids_starting_from_one() throws Exception {
         SmRegisterDao dao = new SmRegisterDao(conn);
 
-        int id1 = dao.insert("D1", DatasetType.Point, 4326, "SmID", "SmGeometry");
-        int id2 = dao.insert("D2", DatasetType.Line, 4326, "SmID", "SmGeometry");
-        int id3 = dao.insert("D3", DatasetType.Region, 4326, "SmID", "SmGeometry");
+        int id1 = dao.insert("D1", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
+        int id2 = dao.insert("D2", DatasetKind.LINE, 4326, "SmID", "SmGeometry");
+        int id3 = dao.insert("D3", DatasetKind.REGION, 4326, "SmID", "SmGeometry");
 
         assertThat(id1).isEqualTo(1);
         assertThat(id2).isEqualTo(2);
@@ -175,7 +175,7 @@ class SystemDaoSpecTest {
     @Test
     void smregister_incrementObjectCount_with_blob_increments_count_and_updates_max_size() throws Exception {
         SmRegisterDao dao = new SmRegisterDao(conn);
-        int id = dao.insert("Pts", DatasetType.Point, 4326, "SmID", "SmGeometry");
+        int id = dao.insert("Pts", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
 
         dao.incrementObjectCount(id, 100);
 
@@ -186,7 +186,7 @@ class SystemDaoSpecTest {
     @Test
     void smregister_incrementObjectCount_with_blob_increments_count_multiple_times() throws Exception {
         SmRegisterDao dao = new SmRegisterDao(conn);
-        int id = dao.insert("Pts", DatasetType.Point, 4326, "SmID", "SmGeometry");
+        int id = dao.insert("Pts", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
 
         dao.incrementObjectCount(id, 100);
         dao.incrementObjectCount(id, 200);
@@ -201,7 +201,7 @@ class SystemDaoSpecTest {
     @Test
     void smregister_incrementObjectCount_without_blob_increments_count() throws Exception {
         SmRegisterDao dao = new SmRegisterDao(conn);
-        int id = dao.insert("Tab", DatasetType.Tabular, 0, "SmID", null);
+        int id = dao.insert("Tab", DatasetKind.TABULAR, 0, "SmID", null);
 
         dao.incrementObjectCount(id);
         dao.incrementObjectCount(id);
@@ -215,7 +215,7 @@ class SystemDaoSpecTest {
     @Test
     void smregister_decrementObjectCount_decrements_after_increment() throws Exception {
         SmRegisterDao dao = new SmRegisterDao(conn);
-        int id = dao.insert("Pts", DatasetType.Point, 4326, "SmID", "SmGeometry");
+        int id = dao.insert("Pts", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
 
         dao.incrementObjectCount(id, 100);
         dao.incrementObjectCount(id, 100);
@@ -228,7 +228,7 @@ class SystemDaoSpecTest {
     @Test
     void smregister_decrementObjectCount_does_not_go_below_zero() throws Exception {
         SmRegisterDao dao = new SmRegisterDao(conn);
-        int id = dao.insert("Pts", DatasetType.Point, 4326, "SmID", "SmGeometry");
+        int id = dao.insert("Pts", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
 
         // objectCount 初始为 0，递减不应产生负值
         dao.decrementObjectCount(id);
@@ -242,7 +242,7 @@ class SystemDaoSpecTest {
     @Test
     void smfieldinfo_findByDatasetId_returns_empty_when_no_fields() throws Exception {
         SmRegisterDao regDao = new SmRegisterDao(conn);
-        int dsId = regDao.insert("Pts", DatasetType.Point, 4326, "SmID", "SmGeometry");
+        int dsId = regDao.insert("Pts", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
 
         SmFieldInfoDao fieldDao = new SmFieldInfoDao(conn);
         List<FieldInfo> result = fieldDao.findByDatasetId(dsId);
@@ -253,11 +253,11 @@ class SystemDaoSpecTest {
     @Test
     void smfieldinfo_findByDatasetId_returns_inserted_fields() throws Exception {
         SmRegisterDao regDao = new SmRegisterDao(conn);
-        int dsId = regDao.insert("Pts", DatasetType.Point, 4326, "SmID", "SmGeometry");
+        int dsId = regDao.insert("Pts", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
 
         SmFieldInfoDao fieldDao = new SmFieldInfoDao(conn);
-        fieldDao.insert(new FieldInfo(dsId, "Name", FieldType.NText, "名称", false));
-        fieldDao.insert(new FieldInfo(dsId, "Value", FieldType.Double, "数值", true));
+        fieldDao.insert(new FieldInfo(dsId, "Name", FieldType.NTEXT, "名称", false));
+        fieldDao.insert(new FieldInfo(dsId, "Value", FieldType.DOUBLE, "数值", true));
 
         List<FieldInfo> result = fieldDao.findByDatasetId(dsId);
 
@@ -267,18 +267,18 @@ class SystemDaoSpecTest {
     @Test
     void smfieldinfo_findByDatasetId_returns_correct_field_values() throws Exception {
         SmRegisterDao regDao = new SmRegisterDao(conn);
-        int dsId = regDao.insert("Pts", DatasetType.Point, 4326, "SmID", "SmGeometry");
+        int dsId = regDao.insert("Pts", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
 
         SmFieldInfoDao fieldDao = new SmFieldInfoDao(conn);
-        fieldDao.insert(new FieldInfo(dsId, "Score", FieldType.Int32, "得分", true));
+        fieldDao.insert(new FieldInfo(dsId, "Score", FieldType.INT32, "得分", true));
 
         List<FieldInfo> result = fieldDao.findByDatasetId(dsId);
 
         assertThat(result).hasSize(1);
         FieldInfo f = result.get(0);
-        assertThat(f.fieldName()).isEqualTo("Score");
-        assertThat(f.fieldType()).isEqualTo(FieldType.Int32);
-        assertThat(f.fieldAlias()).isEqualTo("得分");
+        assertThat(f.name()).isEqualTo("Score");
+        assertThat(f.fieldType()).isEqualTo(FieldType.INT32);
+        assertThat(f.alias()).isEqualTo("得分");
         assertThat(f.required()).isTrue();
         assertThat(f.datasetId()).isEqualTo(dsId);
     }
@@ -286,17 +286,17 @@ class SystemDaoSpecTest {
     @Test
     void smfieldinfo_findByDatasetId_only_returns_fields_for_target_dataset() throws Exception {
         SmRegisterDao regDao = new SmRegisterDao(conn);
-        int dsId1 = regDao.insert("Ds1", DatasetType.Point, 4326, "SmID", "SmGeometry");
-        int dsId2 = regDao.insert("Ds2", DatasetType.Line, 4326, "SmID", "SmGeometry");
+        int dsId1 = regDao.insert("Ds1", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
+        int dsId2 = regDao.insert("Ds2", DatasetKind.LINE, 4326, "SmID", "SmGeometry");
 
         SmFieldInfoDao fieldDao = new SmFieldInfoDao(conn);
-        fieldDao.insert(new FieldInfo(dsId1, "FieldA", FieldType.NText, "", false));
-        fieldDao.insert(new FieldInfo(dsId2, "FieldB", FieldType.NText, "", false));
+        fieldDao.insert(new FieldInfo(dsId1, "FieldA", FieldType.NTEXT, "", false));
+        fieldDao.insert(new FieldInfo(dsId2, "FieldB", FieldType.NTEXT, "", false));
 
         List<FieldInfo> result = fieldDao.findByDatasetId(dsId1);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).fieldName()).isEqualTo("FieldA");
+        assertThat(result.get(0).name()).isEqualTo("FieldA");
     }
 
     // ── SmFieldInfoDao: findByDatasetIdAndFieldName ───────────────────────────
@@ -304,22 +304,22 @@ class SystemDaoSpecTest {
     @Test
     void smfieldinfo_findByDatasetIdAndFieldName_returns_correct_field() throws Exception {
         SmRegisterDao regDao = new SmRegisterDao(conn);
-        int dsId = regDao.insert("Pts", DatasetType.Point, 4326, "SmID", "SmGeometry");
+        int dsId = regDao.insert("Pts", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
 
         SmFieldInfoDao fieldDao = new SmFieldInfoDao(conn);
-        fieldDao.insert(new FieldInfo(dsId, "MyField", FieldType.Double, "我的字段", false));
+        fieldDao.insert(new FieldInfo(dsId, "MyField", FieldType.DOUBLE, "我的字段", false));
 
         Optional<FieldInfo> result = fieldDao.findByDatasetIdAndFieldName(dsId, "MyField");
 
         assertThat(result).isPresent();
-        assertThat(result.get().fieldName()).isEqualTo("MyField");
-        assertThat(result.get().fieldType()).isEqualTo(FieldType.Double);
+        assertThat(result.get().name()).isEqualTo("MyField");
+        assertThat(result.get().fieldType()).isEqualTo(FieldType.DOUBLE);
     }
 
     @Test
     void smfieldinfo_findByDatasetIdAndFieldName_returns_empty_for_nonexistent() throws Exception {
         SmRegisterDao regDao = new SmRegisterDao(conn);
-        int dsId = regDao.insert("Pts", DatasetType.Point, 4326, "SmID", "SmGeometry");
+        int dsId = regDao.insert("Pts", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
 
         SmFieldInfoDao fieldDao = new SmFieldInfoDao(conn);
 
@@ -333,20 +333,20 @@ class SystemDaoSpecTest {
     @Test
     void smfieldinfo_insertAll_inserts_all_fields_with_overridden_dataset_id() throws Exception {
         SmRegisterDao regDao = new SmRegisterDao(conn);
-        int dsId = regDao.insert("Pts", DatasetType.Point, 4326, "SmID", "SmGeometry");
+        int dsId = regDao.insert("Pts", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
 
         SmFieldInfoDao fieldDao = new SmFieldInfoDao(conn);
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "F1", FieldType.NText, "字段1", false),
-                new FieldInfo(0, "F2", FieldType.Int32, "字段2", false),
-                new FieldInfo(0, "F3", FieldType.Double, "字段3", true)
+                new FieldInfo(0, "F1", FieldType.NTEXT, "字段1", false),
+                new FieldInfo(0, "F2", FieldType.INT32, "字段2", false),
+                new FieldInfo(0, "F3", FieldType.DOUBLE, "字段3", true)
         );
         fieldDao.insertAll(dsId, fields);
 
         List<FieldInfo> result = fieldDao.findByDatasetId(dsId);
 
         assertThat(result).hasSize(3);
-        assertThat(result).extracting(FieldInfo::fieldName)
+        assertThat(result).extracting(FieldInfo::name)
                 .containsExactly("F1", "F2", "F3");
         assertThat(result).allMatch(f -> f.datasetId() == dsId);
     }
@@ -354,7 +354,7 @@ class SystemDaoSpecTest {
     @Test
     void smfieldinfo_insertAll_with_empty_list_inserts_nothing() throws Exception {
         SmRegisterDao regDao = new SmRegisterDao(conn);
-        int dsId = regDao.insert("Pts", DatasetType.Point, 4326, "SmID", "SmGeometry");
+        int dsId = regDao.insert("Pts", DatasetKind.POINT, 4326, "SmID", "SmGeometry");
 
         SmFieldInfoDao fieldDao = new SmFieldInfoDao(conn);
         fieldDao.insertAll(dsId, List.of());

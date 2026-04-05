@@ -96,7 +96,7 @@ void shouldReadPointDataFromSampleFile() {
         PointDataset dataset = (PointDataset) dataSource.getDataset("PointData");
 
         // When: 读取要素
-        List<PointFeature> features = dataset.getFeatures();
+        List<PointFeature> features = dataset.list();
 
         // Then: 验证结果
         assertThat(features).isNotEmpty();
@@ -188,7 +188,7 @@ Types: feat, fix, refactor, docs, test, chore, perf
 ```
 feat: add batch write API
 
-- add addFeaturesBatch() method
+- add insertMany() method
 - use single transaction for performance
 - 10-50x performance improvement
 ```

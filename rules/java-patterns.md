@@ -55,13 +55,13 @@ public class SmRegisterDaoImpl implements SmRegisterDao {
 ## Factory 模式（数据集创建）
 
 ```java
-// 根据 DatasetType 枚举创建对应 Dataset 实例
+// 根据 DatasetKind 枚举创建对应 Dataset 实例
 public final class DatasetFactory {
 
     private DatasetFactory() {} // 工具类，禁止实例化
 
     public static Dataset create(DatasetInfo info, Connection connection) {
-        return switch (info.datasetType()) {
+        return switch (info.datasetKind()) {
             case Tabular  -> new TabularDataset(info, connection);
             case Point,
                  PointZ   -> new PointDataset(info, connection);
@@ -71,7 +71,7 @@ public final class DatasetFactory {
                  RegionZ  -> new RegionDataset(info, connection);
             case CAD      -> new CadDataset(info, connection);
             default -> throw new UdbxException(
-                "Unsupported dataset type: " + info.datasetType());
+                "Unsupported dataset type: " + info.datasetKind());
         };
     }
 }
@@ -185,7 +185,7 @@ public final class BinaryWriter {
 
 ```java
 // 写操作必须包裹在事务中
-public void addFeatures(List<Feature> features) {
+public void insertMany(List<Feature> features) {
     try {
         connection.setAutoCommit(false);
         for (Feature f : features) {

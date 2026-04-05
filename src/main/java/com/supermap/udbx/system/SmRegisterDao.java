@@ -1,7 +1,7 @@
 package com.supermap.udbx.system;
 
 import com.supermap.udbx.core.DatasetInfo;
-import com.supermap.udbx.core.DatasetType;
+import com.supermap.udbx.core.DatasetKind;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -93,7 +93,7 @@ public class SmRegisterDao {
         int objectCount = rs.getInt("SmObjectCount");
         int srid = rs.getInt("SmSRID");
 
-        DatasetType datasetType = DatasetType.fromValue(datasetTypeValue);
+        DatasetKind datasetType = DatasetKind.fromValue(datasetTypeValue);
 
         return new DatasetInfo(datasetId, datasetName, datasetType, objectCount, srid);
     }
@@ -109,7 +109,7 @@ public class SmRegisterDao {
      * @return 分配的 SmDatasetID
      * @throws SQLException 操作失败时抛出
      */
-    public int insert(String datasetName, DatasetType datasetType, int srid,
+    public int insert(String datasetName, DatasetKind datasetType, int srid,
                       String idColName, String geoColName) throws SQLException {
         int newId = nextDatasetId();
         String sql = "INSERT INTO SmRegister " +

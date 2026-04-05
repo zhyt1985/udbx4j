@@ -48,7 +48,7 @@ class PerformanceBenchmark {
         long start = System.nanoTime();
         try (UdbxDataSource ds = UdbxDataSource.open(testFile.toString())) {
             PointDataset dataset = (PointDataset) ds.getDataset("points");
-            List<PointFeature> features = dataset.getFeatures();
+            List<PointFeature> features = dataset.list();
             long duration = System.nanoTime() - start;
 
             // Assert
@@ -81,7 +81,7 @@ class PerformanceBenchmark {
 
         try (UdbxDataSource ds = UdbxDataSource.open(testFile.toString())) {
             PointDataset dataset = (PointDataset) ds.getDataset("points");
-            List<PointFeature> features = dataset.getFeatures();
+            List<PointFeature> features = dataset.list();
 
             long memAfter = runtime.totalMemory() - runtime.freeMemory();
             long memUsed = memAfter - memBefore;
@@ -114,7 +114,7 @@ class PerformanceBenchmark {
 
             long start = System.nanoTime();
             for (PointFeature f : features) {
-                dataset.addFeature(f.smId(), f.geometry(), f.attributes());
+                dataset.insert(f);
             }
             long duration = System.nanoTime() - start;
 
@@ -148,7 +148,7 @@ class PerformanceBenchmark {
             // TODO: 实现批量 API 后启用
             // dataset.addFeaturesBatch(features);
             for (PointFeature f : features) {
-                dataset.addFeature(f.smId(), f.geometry(), f.attributes());
+                dataset.insert(f);
             }
             long duration = System.nanoTime() - start;
 
@@ -208,7 +208,7 @@ class PerformanceBenchmark {
             PointDataset dataset = ds.createPointDataset("points", 4326);
             List<PointFeature> features = generateTestFeatures(count);
             for (PointFeature f : features) {
-                dataset.addFeature(f.smId(), f.geometry(), f.attributes());
+                dataset.insert(f);
             }
         }
     }

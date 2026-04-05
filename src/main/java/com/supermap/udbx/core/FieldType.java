@@ -7,20 +7,20 @@ package com.supermap.udbx.core;
  */
 public enum FieldType {
 
-    Boolean(1),
-    Byte(2),
-    Int16(3),
-    Int32(4),
-    Int64(5),
-    Single(6),
-    Double(7),
-    Date(8),
-    Binary(9),
-    Geometry(10),
-    Char(11),
-    NText(127),
-    Text(128),
-    Time(16);  // TODO: 确认白皮书中的确切名称
+    BOOLEAN(1),
+    BYTE(2),
+    INT16(3),
+    INT32(4),
+    INT64(5),
+    SINGLE(6),
+    DOUBLE(7),
+    DATE(8),
+    BINARY(9),
+    GEOMETRY(10),
+    CHAR(11),
+    NTEXT(127),
+    TEXT(128),
+    TIME(16);  // TODO: 确认白皮书中的确切名称
 
     private final int value;
 
@@ -38,6 +38,6 @@ public enum FieldType {
                 return type;
             }
         }
-        throw new IllegalArgumentException("Unknown FieldType value: " + value);
+        throw new UdbxUnsupportedError("Unknown FieldType value: " + value);
     }
 }

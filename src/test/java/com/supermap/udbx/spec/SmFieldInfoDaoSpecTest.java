@@ -53,9 +53,9 @@ class SmFieldInfoDaoSpecTest {
             assertThat(result).isPresent();
             FieldInfo field = result.get();
             assertThat(field.datasetId()).isEqualTo(1);
-            assertThat(field.fieldName()).isEqualTo("NAME");
-            assertThat(field.fieldType()).isEqualTo(FieldType.NText);
-            assertThat(field.fieldAlias()).isEqualTo("NAME"); // SmFieldCaption
+            assertThat(field.name()).isEqualTo("NAME");
+            assertThat(field.fieldType()).isEqualTo(FieldType.NTEXT);
+            assertThat(field.alias()).isEqualTo("NAME"); // SmFieldCaption
             assertThat(field.required()).isFalse(); // SmFieldbRequired=0
         }
     }
@@ -69,7 +69,7 @@ class SmFieldInfoDaoSpecTest {
 
             assertThat(result).isPresent();
             FieldInfo field = result.get();
-            assertThat(field.fieldType()).isEqualTo(FieldType.Int32);
+            assertThat(field.fieldType()).isEqualTo(FieldType.INT32);
             assertThat(field.required()).isFalse();
         }
     }
@@ -83,7 +83,7 @@ class SmFieldInfoDaoSpecTest {
 
             assertThat(result).isPresent();
             FieldInfo field = result.get();
-            assertThat(field.fieldType()).isEqualTo(FieldType.Int32);
+            assertThat(field.fieldType()).isEqualTo(FieldType.INT32);
             assertThat(field.required()).isTrue(); // SmFieldbRequired=1
         }
     }
@@ -97,7 +97,7 @@ class SmFieldInfoDaoSpecTest {
 
             assertThat(result).isPresent();
             FieldInfo field = result.get();
-            assertThat(field.fieldType()).isEqualTo(FieldType.Text);
+            assertThat(field.fieldType()).isEqualTo(FieldType.TEXT);
             assertThat(field.required()).isTrue();
         }
     }
@@ -125,10 +125,10 @@ class SmFieldInfoDaoSpecTest {
 
             // 验证有 SmLength 字段
             Optional<FieldInfo> lengthField = fields.stream()
-                    .filter(f -> f.fieldName().equals("SmLength"))
+                    .filter(f -> f.name().equals("SmLength"))
                     .findFirst();
             assertThat(lengthField).isPresent();
-            assertThat(lengthField.get().fieldType()).isEqualTo(FieldType.Double);
+            assertThat(lengthField.get().fieldType()).isEqualTo(FieldType.DOUBLE);
         }
     }
 
@@ -143,8 +143,8 @@ class SmFieldInfoDaoSpecTest {
             assertThat(fields).hasSizeGreaterThanOrEqualTo(7);
 
             // 验证有 SmArea 和 SmPerimeter 字段
-            assertThat(fields.stream().anyMatch(f -> f.fieldName().equals("SmArea"))).isTrue();
-            assertThat(fields.stream().anyMatch(f -> f.fieldName().equals("SmPerimeter"))).isTrue();
+            assertThat(fields.stream().anyMatch(f -> f.name().equals("SmArea"))).isTrue();
+            assertThat(fields.stream().anyMatch(f -> f.name().equals("SmPerimeter"))).isTrue();
         }
     }
 }

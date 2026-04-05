@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>测试数据来源：SampleData.udbx 中的 BaseMap_R 数据集。
  * <pre>
- *   BaseMap_R: DatasetType=5 (Region), ObjectCount=15, SRID=4326
+ *   BaseMap_R: DatasetKind=5 (Region), ObjectCount=15, SRID=4326
  * </pre>
  *
  * <p>对应白皮书 §3.1.4（面数据集）和 §4.2.5（GAIA MultiPolygon 格式）。
@@ -32,7 +32,7 @@ class RegionDatasetReadTest {
             RegionDataset dataset = (RegionDataset) ds.getDataset("BaseMap_R");
 
             assertThat(dataset).isNotNull();
-            assertThat(dataset.getInfo().datasetName()).isEqualTo("BaseMap_R");
+            assertThat(dataset.getInfo().name()).isEqualTo("BaseMap_R");
         }
     }
 
@@ -41,7 +41,7 @@ class RegionDatasetReadTest {
         try (UdbxDataSource ds = UdbxDataSource.open(SAMPLE_DB)) {
             RegionDataset dataset = (RegionDataset) ds.getDataset("BaseMap_R");
 
-            List<RegionFeature> features = dataset.getFeatures();
+            List<RegionFeature> features = dataset.list();
 
             // BaseMap_R: ObjectCount=15
             assertThat(features).hasSize(15);
@@ -53,10 +53,10 @@ class RegionDatasetReadTest {
         try (UdbxDataSource ds = UdbxDataSource.open(SAMPLE_DB)) {
             RegionDataset dataset = (RegionDataset) ds.getDataset("BaseMap_R");
 
-            List<RegionFeature> features = dataset.getFeatures();
+            List<RegionFeature> features = dataset.list();
             RegionFeature firstFeature = features.get(0);
 
-            assertThat(firstFeature.smId()).isGreaterThan(0);
+            assertThat(firstFeature.id()).isGreaterThan(0);
             assertThat(firstFeature.geometry()).isNotNull();
             assertThat(firstFeature.geometry()).isInstanceOf(MultiPolygon.class);
             assertThat(firstFeature.geometry().isEmpty()).isFalse();

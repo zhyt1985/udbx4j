@@ -36,17 +36,17 @@ class Vector3DDatasetWriteTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointZDataset pd = ds.createPointZDataset("PointsZ", 4326);
-            pd.addFeature(1, GF.createPoint(coord3d), Map.of());
+            pd.insert(new PointFeature(1, GF.createPoint(coord3d), Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             PointZDataset pd = (PointZDataset) ds.getDataset("PointsZ");
             assertThat(pd).isNotNull();
-            List<PointFeature> features = pd.getFeatures();
+            List<PointFeature> features = pd.list();
             assertThat(features).hasSize(1);
 
             PointFeature f = features.get(0);
-            assertThat(f.smId()).isEqualTo(1);
+            assertThat(f.id()).isEqualTo(1);
             assertThat(f.geometry().getX()).isCloseTo(116.39, offset(1e-9));
             assertThat(f.geometry().getY()).isCloseTo(39.91, offset(1e-9));
             assertThat(f.geometry().getCoordinate().getZ()).isCloseTo(50.5, offset(1e-9));
@@ -65,16 +65,16 @@ class Vector3DDatasetWriteTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineZDataset ld = ds.createLineZDataset("LinesZ", 4326);
-            ld.addFeature(1, mls3d, Map.of());
-            ld.addFeature(2, mls3d, Map.of());
+            ld.insert(new LineFeature(1, mls3d, Map.of()));
+            ld.insert(new LineFeature(2, mls3d, Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             LineZDataset ld = (LineZDataset) ds.getDataset("LinesZ");
             assertThat(ld).isNotNull();
-            List<LineFeature> features = ld.getFeatures();
+            List<LineFeature> features = ld.list();
             assertThat(features).hasSize(2);
-            assertThat(features.get(0).smId()).isEqualTo(1);
+            assertThat(features.get(0).id()).isEqualTo(1);
         }
     }
 
@@ -91,15 +91,15 @@ class Vector3DDatasetWriteTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionZDataset rd = ds.createRegionZDataset("RegionsZ", 4326);
-            rd.addFeature(1, mp, Map.of());
+            rd.insert(new RegionFeature(1, mp, Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             RegionZDataset rd = (RegionZDataset) ds.getDataset("RegionsZ");
             assertThat(rd).isNotNull();
-            List<RegionFeature> features = rd.getFeatures();
+            List<RegionFeature> features = rd.list();
             assertThat(features).hasSize(1);
-            assertThat(features.get(0).smId()).isEqualTo(1);
+            assertThat(features.get(0).id()).isEqualTo(1);
         }
     }
 
@@ -109,12 +109,12 @@ class Vector3DDatasetWriteTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointZDataset pd = ds.createPointZDataset("PtZ", 4326);
-            pd.addFeature(1, GF.createPoint(new Coordinate(1, 2, 3)), Map.of());
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(1, 2, 3)), Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             PointZDataset pd = (PointZDataset) ds.getDataset("PtZ");
-            assertThat(pd.getFeature(99999)).isNull();
+            assertThat(pd.getById(99999)).isNull();
         }
     }
 }

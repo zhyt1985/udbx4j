@@ -46,14 +46,14 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointZDataset pd = ds.createPointZDataset("PointsZ", 4326);
-            pd.addFeature(1, GF.createPoint(new Coordinate(10.0, 20.0, 30.0)), Map.of());
-            pd.addFeature(2, GF.createPoint(new Coordinate(11.0, 21.0, 31.0)), Map.of());
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(10.0, 20.0, 30.0)), Map.of()));
+            pd.insert(new PointFeature(2, GF.createPoint(new Coordinate(11.0, 21.0, 31.0)), Map.of()));
 
-            List<PointFeature> features = pd.getFeatures();
+            List<PointFeature> features = pd.list();
             assertThat(features).hasSize(2);
 
             PointFeature f1 = features.get(0);
-            assertThat(f1.smId()).isEqualTo(1);
+            assertThat(f1.id()).isEqualTo(1);
             assertThat(f1.geometry().getX()).isCloseTo(10.0, offset(1e-9));
             assertThat(f1.geometry().getY()).isCloseTo(20.0, offset(1e-9));
             assertThat(f1.geometry().getCoordinate().getZ()).isCloseTo(30.0, offset(1e-9));
@@ -66,12 +66,12 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointZDataset pd = ds.createPointZDataset("PZ", 4326);
-            pd.addFeature(1, GF.createPoint(new Coordinate(1.0, 2.0, 10.0)), Map.of());
-            pd.addFeature(2, GF.createPoint(new Coordinate(3.0, 4.0, 20.0)), Map.of());
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(1.0, 2.0, 10.0)), Map.of()));
+            pd.insert(new PointFeature(2, GF.createPoint(new Coordinate(3.0, 4.0, 20.0)), Map.of()));
 
-            PointFeature f = pd.getFeature(2);
+            PointFeature f = pd.getById(2);
             assertThat(f).isNotNull();
-            assertThat(f.smId()).isEqualTo(2);
+            assertThat(f.id()).isEqualTo(2);
             assertThat(f.geometry().getX()).isCloseTo(3.0, offset(1e-9));
             assertThat(f.geometry().getY()).isCloseTo(4.0, offset(1e-9));
             assertThat(f.geometry().getCoordinate().getZ()).isCloseTo(20.0, offset(1e-9));
@@ -84,9 +84,9 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointZDataset pd = ds.createPointZDataset("PZ", 4326);
-            pd.addFeature(1, GF.createPoint(new Coordinate(1.0, 2.0, 3.0)), Map.of());
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(1.0, 2.0, 3.0)), Map.of()));
 
-            assertThat(pd.getFeature(9999)).isNull();
+            assertThat(pd.getById(9999)).isNull();
         }
     }
 
@@ -96,16 +96,16 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointZDataset pd = ds.createPointZDataset("PZ", 4326);
-            pd.addFeature(1, GF.createPoint(new Coordinate(1.0, 2.0, 3.0)), Map.of());
-            pd.addFeature(2, GF.createPoint(new Coordinate(4.0, 5.0, 6.0)), Map.of());
-            pd.addFeature(3, GF.createPoint(new Coordinate(7.0, 8.0, 9.0)), Map.of());
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(1.0, 2.0, 3.0)), Map.of()));
+            pd.insert(new PointFeature(2, GF.createPoint(new Coordinate(4.0, 5.0, 6.0)), Map.of()));
+            pd.insert(new PointFeature(3, GF.createPoint(new Coordinate(7.0, 8.0, 9.0)), Map.of()));
 
-            assertThat(pd.getFeatures()).hasSize(3);
+            assertThat(pd.list()).hasSize(3);
 
-            pd.deleteFeature(2);
+            pd.delete(2);
 
-            assertThat(pd.getFeatures()).hasSize(2);
-            assertThat(pd.getFeature(2)).isNull();
+            assertThat(pd.list()).hasSize(2);
+            assertThat(pd.getById(2)).isNull();
         }
 
         // 重新打开验证 SmObjectCount 持久化
@@ -121,9 +121,9 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointZDataset pd = ds.createPointZDataset("PZ", 4326);
-            pd.addFeature(1, GF.createPoint(new Coordinate(1.0, 2.0, 3.0)), Map.of());
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(1.0, 2.0, 3.0)), Map.of()));
 
-            assertThatThrownBy(() -> pd.deleteFeature(9999))
+            assertThatThrownBy(() -> pd.delete(9999))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
         }
@@ -133,22 +133,22 @@ class Vector3DDatasetSpecTest {
     void pointz_updateFeature_changes_geometry_and_attributes(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("pointz_update.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "NAME", FieldType.NText, "名称", false),
-                new FieldInfo(0, "ELEV", FieldType.Double, "高程", false)
+                new FieldInfo(0, "NAME", FieldType.NTEXT, "名称", false),
+                new FieldInfo(0, "ELEV", FieldType.DOUBLE, "高程", false)
         );
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointZDataset pd = ds.createPointZDataset("PZ", 4326, fields);
-            pd.addFeature(1, GF.createPoint(new Coordinate(1.0, 2.0, 3.0)),
-                    Map.of("NAME", "OldName", "ELEV", 100.0));
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(1.0, 2.0, 3.0)),
+                    Map.of("NAME", "OldName", "ELEV", 100.0)));
 
-            pd.updateFeature(1, GF.createPoint(new Coordinate(10.0, 20.0, 50.0)),
+            pd.update(1, GF.createPoint(new Coordinate(10.0, 20.0, 50.0)),
                     Map.of("NAME", "NewName", "ELEV", 500.0));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             PointZDataset pd = (PointZDataset) ds.getDataset("PZ");
-            PointFeature f = pd.getFeature(1);
+            PointFeature f = pd.getById(1);
 
             assertThat(f).isNotNull();
             assertThat(f.geometry().getX()).isCloseTo(10.0, offset(1e-9));
@@ -164,9 +164,9 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointZDataset pd = ds.createPointZDataset("PZ", 4326);
-            pd.addFeature(1, GF.createPoint(new Coordinate(1.0, 2.0, 3.0)), Map.of());
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(1.0, 2.0, 3.0)), Map.of()));
 
-            assertThatThrownBy(() -> pd.updateFeature(9999,
+            assertThatThrownBy(() -> pd.update(9999,
                     GF.createPoint(new Coordinate(0.0, 0.0, 0.0)), Map.of()))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
@@ -179,8 +179,8 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointZDataset pd = ds.createPointZDataset("PZ", 4326);
-            pd.addFeature(1, GF.createPoint(new Coordinate(1.0, 2.0, 3.0)), Map.of());
-            pd.addFeature(2, GF.createPoint(new Coordinate(4.0, 5.0, 6.0)), Map.of());
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(1.0, 2.0, 3.0)), Map.of()));
+            pd.insert(new PointFeature(2, GF.createPoint(new Coordinate(4.0, 5.0, 6.0)), Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
@@ -193,18 +193,18 @@ class Vector3DDatasetSpecTest {
     void pointz_addFeature_with_attributes(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("pointz_attr.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "LABEL", FieldType.NText, "标签", false)
+                new FieldInfo(0, "LABEL", FieldType.NTEXT, "标签", false)
         );
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             PointZDataset pd = ds.createPointZDataset("PZ", 4326, fields);
-            pd.addFeature(1, GF.createPoint(new Coordinate(5.0, 6.0, 7.0)),
-                    Map.of("LABEL", "TestPoint"));
+            pd.insert(new PointFeature(1, GF.createPoint(new Coordinate(5.0, 6.0, 7.0)),
+                    Map.of("LABEL", "TestPoint")));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             PointZDataset pd = (PointZDataset) ds.getDataset("PZ");
-            PointFeature f = pd.getFeature(1);
+            PointFeature f = pd.getById(1);
             assertThat(f).isNotNull();
             assertThat(f.attributes()).containsEntry("LABEL", "TestPoint");
         }
@@ -228,14 +228,14 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineZDataset ld = ds.createLineZDataset("LinesZ", 4326);
-            ld.addFeature(1, mls, Map.of());
-            ld.addFeature(2, mls, Map.of());
+            ld.insert(new LineFeature(1, mls, Map.of()));
+            ld.insert(new LineFeature(2, mls, Map.of()));
 
-            List<LineFeature> features = ld.getFeatures();
+            List<LineFeature> features = ld.list();
             assertThat(features).hasSize(2);
 
             LineFeature f1 = features.get(0);
-            assertThat(f1.smId()).isEqualTo(1);
+            assertThat(f1.id()).isEqualTo(1);
             // 验证第一个坐标的 Z 值
             assertThat(f1.geometry().getCoordinate().getZ()).isCloseTo(10.0, offset(1e-9));
         }
@@ -254,12 +254,12 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineZDataset ld = ds.createLineZDataset("LZ", 4326);
-            ld.addFeature(1, mls, Map.of());
-            ld.addFeature(2, mls, Map.of());
+            ld.insert(new LineFeature(1, mls, Map.of()));
+            ld.insert(new LineFeature(2, mls, Map.of()));
 
-            LineFeature f = ld.getFeature(2);
+            LineFeature f = ld.getById(2);
             assertThat(f).isNotNull();
-            assertThat(f.smId()).isEqualTo(2);
+            assertThat(f.id()).isEqualTo(2);
             assertThat(f.geometry().getCoordinate().getZ()).isCloseTo(100.0, offset(1e-9));
         }
     }
@@ -277,9 +277,9 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineZDataset ld = ds.createLineZDataset("LZ", 4326);
-            ld.addFeature(1, mls, Map.of());
+            ld.insert(new LineFeature(1, mls, Map.of()));
 
-            assertThat(ld.getFeature(9999)).isNull();
+            assertThat(ld.getById(9999)).isNull();
         }
     }
 
@@ -296,16 +296,16 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineZDataset ld = ds.createLineZDataset("LZ", 4326);
-            ld.addFeature(1, mls, Map.of());
-            ld.addFeature(2, mls, Map.of());
-            ld.addFeature(3, mls, Map.of());
+            ld.insert(new LineFeature(1, mls, Map.of()));
+            ld.insert(new LineFeature(2, mls, Map.of()));
+            ld.insert(new LineFeature(3, mls, Map.of()));
 
-            assertThat(ld.getFeatures()).hasSize(3);
+            assertThat(ld.list()).hasSize(3);
 
-            ld.deleteFeature(2);
+            ld.delete(2);
 
-            assertThat(ld.getFeatures()).hasSize(2);
-            assertThat(ld.getFeature(2)).isNull();
+            assertThat(ld.list()).hasSize(2);
+            assertThat(ld.getById(2)).isNull();
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
@@ -327,9 +327,9 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineZDataset ld = ds.createLineZDataset("LZ", 4326);
-            ld.addFeature(1, mls, Map.of());
+            ld.insert(new LineFeature(1, mls, Map.of()));
 
-            assertThatThrownBy(() -> ld.deleteFeature(9999))
+            assertThatThrownBy(() -> ld.delete(9999))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
         }
@@ -339,7 +339,7 @@ class Vector3DDatasetSpecTest {
     void linez_updateFeature_changes_geometry_and_attributes(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("linez_update.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "ROAD", FieldType.NText, "道路", false)
+                new FieldInfo(0, "ROAD", FieldType.NTEXT, "道路", false)
         );
         org.locationtech.jts.geom.MultiLineString mlsOld = GF.createMultiLineString(
                 new org.locationtech.jts.geom.LineString[]{
@@ -358,13 +358,13 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineZDataset ld = ds.createLineZDataset("LZ", 4326, fields);
-            ld.addFeature(1, mlsOld, Map.of("ROAD", "OldRoad"));
-            ld.updateFeature(1, mlsNew, Map.of("ROAD", "NewRoad"));
+            ld.insert(new LineFeature(1, mlsOld, Map.of("ROAD", "OldRoad")));
+            ld.update(1, mlsNew, Map.of("ROAD", "NewRoad"));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             LineZDataset ld = (LineZDataset) ds.getDataset("LZ");
-            LineFeature f = ld.getFeature(1);
+            LineFeature f = ld.getById(1);
 
             assertThat(f).isNotNull();
             assertThat(f.geometry().getCoordinate().getZ()).isCloseTo(100.0, offset(1e-9));
@@ -385,9 +385,9 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             LineZDataset ld = ds.createLineZDataset("LZ", 4326);
-            ld.addFeature(1, mls, Map.of());
+            ld.insert(new LineFeature(1, mls, Map.of()));
 
-            assertThatThrownBy(() -> ld.updateFeature(9999, mls, Map.of()))
+            assertThatThrownBy(() -> ld.update(9999, mls, Map.of()))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
         }
@@ -415,14 +415,14 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionZDataset rd = ds.createRegionZDataset("RegionsZ", 4326);
-            rd.addFeature(1, buildMultiPolygon3D(50.0), Map.of());
-            rd.addFeature(2, buildMultiPolygon3D(60.0), Map.of());
+            rd.insert(new RegionFeature(1, buildMultiPolygon3D(50.0), Map.of()));
+            rd.insert(new RegionFeature(2, buildMultiPolygon3D(60.0), Map.of()));
 
-            List<RegionFeature> features = rd.getFeatures();
+            List<RegionFeature> features = rd.list();
             assertThat(features).hasSize(2);
 
             RegionFeature f1 = features.get(0);
-            assertThat(f1.smId()).isEqualTo(1);
+            assertThat(f1.id()).isEqualTo(1);
             assertThat(f1.geometry().getCoordinate().getZ()).isCloseTo(50.0, offset(1e-9));
         }
     }
@@ -433,12 +433,12 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionZDataset rd = ds.createRegionZDataset("RZ", 4326);
-            rd.addFeature(1, buildMultiPolygon3D(10.0), Map.of());
-            rd.addFeature(2, buildMultiPolygon3D(20.0), Map.of());
+            rd.insert(new RegionFeature(1, buildMultiPolygon3D(10.0), Map.of()));
+            rd.insert(new RegionFeature(2, buildMultiPolygon3D(20.0), Map.of()));
 
-            RegionFeature f = rd.getFeature(2);
+            RegionFeature f = rd.getById(2);
             assertThat(f).isNotNull();
-            assertThat(f.smId()).isEqualTo(2);
+            assertThat(f.id()).isEqualTo(2);
             assertThat(f.geometry().getCoordinate().getZ()).isCloseTo(20.0, offset(1e-9));
         }
     }
@@ -449,9 +449,9 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionZDataset rd = ds.createRegionZDataset("RZ", 4326);
-            rd.addFeature(1, buildMultiPolygon3D(5.0), Map.of());
+            rd.insert(new RegionFeature(1, buildMultiPolygon3D(5.0), Map.of()));
 
-            assertThat(rd.getFeature(9999)).isNull();
+            assertThat(rd.getById(9999)).isNull();
         }
     }
 
@@ -461,16 +461,16 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionZDataset rd = ds.createRegionZDataset("RZ", 4326);
-            rd.addFeature(1, buildMultiPolygon3D(5.0), Map.of());
-            rd.addFeature(2, buildMultiPolygon3D(5.0), Map.of());
-            rd.addFeature(3, buildMultiPolygon3D(5.0), Map.of());
+            rd.insert(new RegionFeature(1, buildMultiPolygon3D(5.0), Map.of()));
+            rd.insert(new RegionFeature(2, buildMultiPolygon3D(5.0), Map.of()));
+            rd.insert(new RegionFeature(3, buildMultiPolygon3D(5.0), Map.of()));
 
-            assertThat(rd.getFeatures()).hasSize(3);
+            assertThat(rd.list()).hasSize(3);
 
-            rd.deleteFeature(2);
+            rd.delete(2);
 
-            assertThat(rd.getFeatures()).hasSize(2);
-            assertThat(rd.getFeature(2)).isNull();
+            assertThat(rd.list()).hasSize(2);
+            assertThat(rd.getById(2)).isNull();
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
@@ -485,9 +485,9 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionZDataset rd = ds.createRegionZDataset("RZ", 4326);
-            rd.addFeature(1, buildMultiPolygon3D(5.0), Map.of());
+            rd.insert(new RegionFeature(1, buildMultiPolygon3D(5.0), Map.of()));
 
-            assertThatThrownBy(() -> rd.deleteFeature(9999))
+            assertThatThrownBy(() -> rd.delete(9999))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
         }
@@ -497,18 +497,18 @@ class Vector3DDatasetSpecTest {
     void regionz_updateFeature_changes_geometry_and_attributes(@TempDir Path tmpDir) {
         String path = tmpDir.resolve("regionz_update.udbx").toString();
         List<FieldInfo> fields = List.of(
-                new FieldInfo(0, "AREA_NAME", FieldType.NText, "区域名", false)
+                new FieldInfo(0, "AREA_NAME", FieldType.NTEXT, "区域名", false)
         );
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionZDataset rd = ds.createRegionZDataset("RZ", 4326, fields);
-            rd.addFeature(1, buildMultiPolygon3D(5.0), Map.of("AREA_NAME", "OldArea"));
-            rd.updateFeature(1, buildMultiPolygon3D(99.0), Map.of("AREA_NAME", "NewArea"));
+            rd.insert(new RegionFeature(1, buildMultiPolygon3D(5.0), Map.of("AREA_NAME", "OldArea")));
+            rd.update(1, buildMultiPolygon3D(99.0), Map.of("AREA_NAME", "NewArea"));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {
             RegionZDataset rd = (RegionZDataset) ds.getDataset("RZ");
-            RegionFeature f = rd.getFeature(1);
+            RegionFeature f = rd.getById(1);
 
             assertThat(f).isNotNull();
             assertThat(f.geometry().getCoordinate().getZ()).isCloseTo(99.0, offset(1e-9));
@@ -522,9 +522,9 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionZDataset rd = ds.createRegionZDataset("RZ", 4326);
-            rd.addFeature(1, buildMultiPolygon3D(5.0), Map.of());
+            rd.insert(new RegionFeature(1, buildMultiPolygon3D(5.0), Map.of()));
 
-            assertThatThrownBy(() -> rd.updateFeature(9999, buildMultiPolygon3D(0.0), Map.of()))
+            assertThatThrownBy(() -> rd.update(9999, buildMultiPolygon3D(0.0), Map.of()))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("不存在");
         }
@@ -536,9 +536,9 @@ class Vector3DDatasetSpecTest {
 
         try (UdbxDataSource ds = UdbxDataSource.create(path)) {
             RegionZDataset rd = ds.createRegionZDataset("RZ", 4326);
-            rd.addFeature(1, buildMultiPolygon3D(5.0), Map.of());
-            rd.addFeature(2, buildMultiPolygon3D(5.0), Map.of());
-            rd.addFeature(3, buildMultiPolygon3D(5.0), Map.of());
+            rd.insert(new RegionFeature(1, buildMultiPolygon3D(5.0), Map.of()));
+            rd.insert(new RegionFeature(2, buildMultiPolygon3D(5.0), Map.of()));
+            rd.insert(new RegionFeature(3, buildMultiPolygon3D(5.0), Map.of()));
         }
 
         try (UdbxDataSource ds = UdbxDataSource.open(path)) {

@@ -1,7 +1,9 @@
 package com.supermap.udbx.benchmark;
 
 import com.supermap.udbx.UdbxDataSource;
+import com.supermap.udbx.core.QueryOptions;
 import com.supermap.udbx.dataset.PointDataset;
+import com.supermap.udbx.dataset.PointFeature;
 import com.supermap.udbx.streaming.AutoCloseableStream;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -9,6 +11,7 @@ import org.locationtech.jts.geom.Point;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 
 /**
  * 简化的性能测试工具，用于测量流式读取的性能改进。
@@ -34,7 +37,7 @@ public class SimplePerformanceTest {
                     116.0 + (i % 1000) * 0.001,
                     39.0 + (i / 1000) * 0.001
                 ));
-                pd.addFeature(i + 1, point, null);
+                pd.insert(new PointFeature(i + 1, point, Map.of()));
             }
             long writeTime = System.currentTimeMillis() - writeStart;
             System.out.println("   写入完成，耗时: " + writeTime + " ms\n");
@@ -48,7 +51,7 @@ public class SimplePerformanceTest {
         long batchStart = System.currentTimeMillis();
         try (UdbxDataSource ds = UdbxDataSource.open(testFile.toString());
              PointDataset pd = (PointDataset) ds.getDataset("points")) {
-            int count = pd.getFeatures().size();
+            int count = pd.list().size();
             long batchTime = System.currentTimeMillis() - batchStart;
             long batchEndMem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
             long batchMemUsed = (batchEndMem - batchStartMem) / (1024 * 1024);
@@ -64,7 +67,7 @@ public class SimplePerformanceTest {
         long streamStartMem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
         long streamStart = System.currentTimeMillis();
         try (UdbxDataSource ds = UdbxDataSource.open(testFile.toString());
-             AutoCloseableStream<?> stream = ds.getDataset("points").streamFeatures()) {
+             AutoCloseableStream<?> stream = ds.getDataset("points").stream()) {
             long count = stream.getStream().count();
             long streamTime = System.currentTimeMillis() - streamStart;
             long streamEndMem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
@@ -86,7 +89,7 @@ public class SimplePerformanceTest {
             int pageSize = 1000;
             int offset = 0;
             while (true) {
-                var batch = pd.getFeatures(offset, pageSize);
+                var batch = pd.list(new QueryOptions(null, pageSize, offset));
                 if (batch.isEmpty()) break;
                 totalCount += batch.size();
                 offset += pageSize;
@@ -104,7 +107,7 @@ public class SimplePerformanceTest {
         try (UdbxDataSource ds = UdbxDataSource.open(testFile.toString());
              PointDataset pd = (PointDataset) ds.getDataset("points")) {
             long countStart = System.currentTimeMillis();
-            int count = pd.getCount();
+            int count = pd.count();
             long countTime = System.currentTimeMillis() - countStart;
             System.out.println("   要素总数: " + count);
             System.out.println("   耗时: " + countTime + " ms\n");
